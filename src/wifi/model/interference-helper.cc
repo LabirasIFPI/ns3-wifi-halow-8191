@@ -221,6 +221,14 @@ InterferenceHelper::AppendEvent (Ptr<InterferenceHelper::Event> event)
         {
           m_firstPower += i->GetDelta ();
         }
+      // With no remaining end events, every previously added signal has
+      // ended. Repeated +/- power additions can leave a floating-point
+      // residue larger than thermal noise, including a negative residue.
+      // Restore the known physical baseline only when no signal is active.
+      if (nowIterator == m_niChanges.end ())
+        {
+          m_firstPower = 0.0;
+        }
       m_niChanges.erase (m_niChanges.begin (), nowIterator);
       m_niChanges.insert (m_niChanges.begin (), NiChange (event->GetStartTime (), event->GetRxPowerW ()));
     }
@@ -590,7 +598,7 @@ else
                                                                  headerMode),
                                                    plcpPayloadStart - previous,
                                                    headerMode);
-                 
+
                  NS_LOG_DEBUG ("Case 2a - previous is in S1G-A or in S1G training or in S1G-B and current after payload start: mode=" << htHeaderMode << ", psr=" << psr);
              }
              //Case 2b: current is in S1G-A or in S1G training or in S1G-B
@@ -601,7 +609,7 @@ else
                                                                  headerMode),
                                                    current - previous,
                                                    headerMode);
-                 
+
                  NS_LOG_DEBUG ("Case 2b - previous is in S1G-A or in S1G training or in S1G-B and current is S1G-A or in S1G training or in S1G-B: mode=" << htHeaderMode << ", psr=" << psr);
              }
          }
@@ -618,9 +626,9 @@ else
                                                                      headerMode),
                                                        plcpPayloadStart - previous,
                                                        headerMode);
-                     
+
                      NS_LOG_DEBUG ("Case 3aii - previous in LTF and current after payload start: HT mode=" << htHeaderMode << ", non-HT mode=" << headerMode << ", psr=" << psr);
-                 
+
              }
              //Case 3b: current with previous in LTF or SIG
              else
@@ -630,7 +638,7 @@ else
                                                                  headerMode),
                                                    current - previous,
                                                    headerMode);
-                 
+
                  NS_LOG_DEBUG ("Case 3c - current with previous in LTF or SIG: mode=" << headerMode << ", psr=" << psr);
              }
          }
@@ -644,38 +652,38 @@ else
                                                                      headerMode),
                                                        plcpPayloadStart - plcpHeaderStart, //For S1G_LONG,  plcpHeaderStart equals plcpSigAStart
                                                        headerMode);
-                     
+
                      NS_LOG_DEBUG ("Case 4a - previous is in the preamble: mode=" << headerMode << ", psr=" << psr);
-                 
+
              }
              //only S1G_LONG come here
              else if (current >= plcpSigAStart)
              {
                  NS_ASSERT ((preamble != WIFI_PREAMBLE_S1G_SHORT) && (preamble != WIFI_PREAMBLE_S1G_1M));
-                 
+
                  psr *= CalculateChunkSuccessRate (CalculateSnr (powerW,
                                                                  noiseInterferenceW,
                                                                  headerMode),
                                                    current - plcpSigAStart,
                                                    headerMode);
-                 
+
                  NS_LOG_DEBUG ("Case 4b - previous is in the preamble: mode=" << headerMode << ", psr=" << psr);
              }
              //S1G_LONG will not come here
              else if (current >= plcpHeaderStart)
              {
                  NS_ASSERT (preamble != WIFI_PREAMBLE_S1G_LONG);
-                 
+
                  psr *= CalculateChunkSuccessRate (CalculateSnr (powerW,
                                                                  noiseInterferenceW,
                                                                  headerMode),
                                                    current - plcpHeaderStart,
                                                    headerMode);
-                 
+
                  NS_LOG_DEBUG ("Case 4c - previous is in the preamble: mode=" << headerMode << ", psr=" << psr);
              }
          }
-      }      
+      }
 
       noiseInterferenceW += (*j).GetDelta ();
       previous = (*j).GetTime ();

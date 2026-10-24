@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005 INRIA
@@ -303,6 +304,15 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 {
   NS_LOG_FUNCTION (packet << hdr);
   NS_ASSERT (hdr->IsData () || hdr->IsMgt () || hdr->IsS1gBeacon ());
+  // S1G beacons have neither Sequence Control nor Retry/fragment fields.
+  // Do not apply legacy duplicate filtering or share a pending unicast
+  // fragment reassembly with this independent broadcast announcement.
+  if (hdr->IsS1gBeacon ())
+    {
+      m_callback (packet, hdr);
+      return;
+    }
+  if (hdr->IsData() && hdr->IsToDs()) HALOW_DIAG(hdr->GetAddr2(), "uplink_middle_entry", "uid=" << packet->GetUid() << " seq=" << hdr->GetSequenceNumber() << " retry=" << hdr->IsRetry());
   OriginatorRxStatus *originator = Lookup (hdr);
   /**
    * The check below is really uneeded because it can fail in a lot of
@@ -321,6 +331,7 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
   //filter duplicates.
   if (IsDuplicate (hdr, originator))
     {
+      if (hdr->IsData() && hdr->IsToDs()) HALOW_DIAG(hdr->GetAddr2(), "uplink_duplicate", "uid=" << packet->GetUid() << " seq=" << hdr->GetSequenceNumber() << " last_control=" << originator->GetLastSequenceControl());
       NS_LOG_DEBUG ("duplicate from=" << hdr->GetAddr2 () <<
                     ", seq=" << hdr->GetSequenceNumber () <<
                     ", frag=" << hdr->GetFragmentNumber ());
@@ -329,6 +340,7 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
   Ptr<Packet> agregate = HandleFragments (packet, hdr, originator);
   if (agregate == 0)
     {
+      if (hdr->IsData() && hdr->IsToDs()) HALOW_DIAG(hdr->GetAddr2(), "uplink_fragment_wait", "uid=" << packet->GetUid());
       return;
     }
   NS_LOG_DEBUG ("forwarding data from=" << hdr->GetAddr2 () <<
@@ -338,6 +350,7 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     {
       originator->SetSequenceControl (hdr->GetSequenceControl ());
     }
+  if (hdr->IsData() && hdr->IsToDs()) HALOW_DIAG(hdr->GetAddr2(), "uplink_middle_forward", "uid=" << agregate->GetUid());
   m_callback (agregate, hdr);
 }
 

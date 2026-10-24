@@ -1,0 +1,9 @@
+{
+  "reported_by": "user",
+  "date": "2026-10-16",
+  "test": "ap-repeated-association-check",
+  "status": "aborted_buffer_assert",
+  "exit_code": null,
+  "backtrace_available": false,
+  "association_fix_validated": false
+}

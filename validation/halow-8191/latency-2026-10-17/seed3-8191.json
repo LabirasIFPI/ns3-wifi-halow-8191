@@ -1,0 +1,90 @@
+{
+  "run": "results/rotating-8191-20261020T134315930040Z",
+  "events": {
+    "request_tx": 8191,
+    "ap_rx": 8191,
+    "echo_rx": 8191
+  },
+  "latency": {
+    "uplink_ms": {
+      "min": 2.28,
+      "mean": 38.04664429031864,
+      "median": 27.136038,
+      "p95_nearest_rank": 99.156097,
+      "max": 533.240186
+    },
+    "rtt_ms": {
+      "min": 15.189708,
+      "mean": 481.6947172085215,
+      "median": 478.081655,
+      "p95_nearest_rank": 853.397665,
+      "max": 1876.089752
+    },
+    "ap_receive_to_echo_ms": {
+      "min": 7.449349,
+      "mean": 443.6480729182029,
+      "median": 444.293609,
+      "p95_nearest_rank": 816.886329,
+      "max": 1861.90761
+    }
+  },
+  "checks": {
+    "same_binary_as_seed2": true,
+    "same_recorded_sources_as_seed2": true
+  },
+  "execution": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "halow-8191-20261020t134315930040z",
+      "--ulimit",
+      "core=0",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "ns3-halow-env",
+      "timeout",
+      "28800",
+      "env",
+      "LD_LIBRARY_PATH=build-o2",
+      "./build-o2/scratch/test/test",
+      "--Nsta=8191",
+      "--RAWConfigFile=results/rotating-8191-20261020T134315930040Z/raw.txt",
+      "--RotateRawPages=1",
+      "--pageSliceCount=2",
+      "--pageSliceLength=16",
+      "--AssociationTimeout=600.0",
+      "--simulationTime=120.0",
+      "--CoolDownPeriod=10",
+      "--TrafficType=udpecho",
+      "--TrafficInterval=120000",
+      "--TrafficPackets=1",
+      "--payloadSize=96",
+      "--rho=10",
+      "--seed=3",
+      "--VisualizerIP=none",
+      "--StatisticsInterval=10",
+      "--ResultPrefix=results/rotating-8191-20261020T134315930040Z/run"
+    ],
+    "parameters": {
+      "build_dir": "build-o2",
+      "stations": 8191,
+      "association_timeout": 600.0,
+      "traffic_time": 120.0,
+      "cooldown": 10,
+      "packets": 1,
+      "wall_timeout": 28800,
+      "seed": 3,
+      "diagnostic_aids": "",
+      "tim_page_slices": 2
+    },
+    "status": "finished",
+    "started_utc": "20261020T134315930040Z",
+    "exit_code": 0,
+    "wall_seconds": 13758.165887359064
+  },
+  "complete_transactions": 8191
+}

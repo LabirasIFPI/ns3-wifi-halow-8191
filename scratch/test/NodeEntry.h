@@ -22,13 +22,15 @@ using namespace ns3;
 
 class NodeEntry {
 public:
+    static void OpenApplicationEvents(const std::string& prefix);
+    static void CloseApplicationEvents();
     int id;
 
     uint32_t aId = 8192; // unassociated is 8192
     uint16_t rpsIndex = 0;
     uint8_t rawGroupNumber = 0;
     uint8_t rawSlotIndex = 0;
-    
+
     double x = 0;
     double y = 0;
     bool isAssociated = false;
@@ -47,7 +49,7 @@ public:
 		SERVER,
 		DUMMY
     } m_nodeType;
-    
+
     void SetAssociation(std::string context, Mac48Address address);
     void UnsetAssociation(std::string context, Mac48Address address);
     void OnS1gBeaconMissed(std::string context,bool nextBeaconIsDTIM);
@@ -57,7 +59,7 @@ public:
     void OnPhyTxBegin(std::string context, Ptr<const Packet> packet);
     void OnPhyTxEnd(std::string context,Ptr<const Packet> packet);
     void OnPhyTxDrop(std::string context,Ptr<const Packet> packet, DropReason reason);
-    
+
     void OnPhyRxBegin(std::string context,Ptr<const Packet> packet);
     void OnPhyRxEnd(std::string context,Ptr<const Packet> packet);
     void OnPhyRxDrop(std::string context,Ptr<const Packet> packet, DropReason reason);
@@ -109,7 +111,7 @@ public:
     void OnCoapPacketReceived(Ptr<const Packet> packet, Address from);
 
     void UpdateQueueLength();
-    
+
     void SetAssociatedCallback(std::function<void()> assocCallback);
     void SetDeassociatedCallback(std::function<void()> assocCallback);
 
@@ -145,4 +147,3 @@ private:
 };
 
 #endif /* NODEENTRY_H */
-

@@ -19,16 +19,17 @@
  */
 
 #include "tim.h"
+#include "ns3/abort.h"
 #include "ns3/assert.h"
 #include "ns3/log.h" //for test
 #include "ns3/attribute.h"
-#include "pageSlice.h" 
+#include "pageSlice.h"
 
 
 namespace ns3 {
-    
+
 NS_LOG_COMPONENT_DEFINE ("pageSlice");
-    
+
 pageSlice::pageSlice () :  m_ElementId (209)
 {
 	for (auto i=0; i < 4; i++)
@@ -86,7 +87,7 @@ pageSlice::SetTIMOffset (uint8_t count)
 //to be implemented, should divided into traffic indicator, page slice and page index
 void
 pageSlice::SetPageBitmap (uint32_t control)
-{  
+{
  if ( (control & 0xff000000) > 0)
   {
      m_length = 4;
@@ -105,17 +106,17 @@ pageSlice::SetPageBitmap (uint32_t control)
   }
  else
   {
-     m_length = 0; 
-  }    
- 
+     m_length = 0;
+  }
+
   for (uint8_t i=0; i < m_length; i++ )
    {
       m_PageBitmaparry[i] = (control >> i*8) & 0x000000ff ;
    }
- 
+
   m_PageSliceControl = this->GetPageindex()  | ((m_PageSliceLen & 0x1f ) << 2 )| ( (m_PageSliceCount & 0x1f) << 7 )
          | ((m_BlockOffset & 0x1f )<< 12 ) | ( (m_TIMOffset & 0x0f) << 17 );
-  
+
   m_PageBitmap = m_PageBitmaparry;
   //printf("     ---pageSlice::SetPageBitmap -- m_PageBitmap = %x\n", *m_PageBitmap);
   //printf("     ---pageSlice::SetPageBitmap -- m_length = %d\n", m_length);
@@ -168,7 +169,7 @@ pageSlice::GetTIMOffset (void) const
 uint8_t *
 pageSlice::GetPageBitmap (void) const
 {
-  return m_PageBitmap;
+  return const_cast<uint8_t *>(m_PageBitmaparry);
 }
 
 uint8_t
@@ -202,28 +203,27 @@ pageSlice::SerializeInformationField (Buffer::Iterator start) const
  //start.WriteU32 (m_PageBitmap);
  //start.Write (m_PageBitmapP, m_length);
  NS_ASSERT (m_length < 5);
- for (uint8_t i=0; i < m_length; i++ )
-   {
-      start.Write (&m_PageBitmaparry[i], m_length);
-   }
+ start.Write (m_PageBitmaparry, m_length);
  }
 
 uint8_t
 pageSlice::DeserializeInformationField (Buffer::Iterator start, uint8_t length)
 {
+  NS_ABORT_MSG_IF (length < 4 || length > 8,
+                   "Invalid Page Slice information field length");
   uint8_t  m_PageSliceControl_l;
   uint8_t  m_PageSliceControl_m;
   uint8_t  m_PageSliceControl_h;
-  
+
  // NS_LOG_UNCOND ("DeserializeInformationField length = " << length);
-  
+
   m_PagePeriod = start.ReadU8 ();
   m_PageSliceControl_l = start.ReadU8 ();
   m_PageSliceControl_m = start.ReadU8 ();
   m_PageSliceControl_h = start.ReadU8 ();
   start.Read (m_PageBitmaparry, length - 4);
   m_PageBitmap = m_PageBitmaparry;
-  
+
   m_PageSliceControl = (uint32_t)m_PageSliceControl_l | (uint32_t)m_PageSliceControl_m << 8 | (uint32_t) m_PageSliceControl_h << 16;
 
    this->SetPageindex (m_PageSliceControl & 0x00000003);
@@ -237,13 +237,13 @@ pageSlice::DeserializeInformationField (Buffer::Iterator start, uint8_t length)
 }
 
 /*
-void 
+void
 pageSlice::Print(std::ostream& os) const {
     os << "DTIM Count: " << std::to_string(m_PagePeriod) << std::endl;
     os << "DTIM Period: " << std::to_string(m_PageSliceControl) << std::endl;
     os << "Bitmap Control: " << std::to_string(m_PageBitmap) << std::endl;
-    
-    
+
+
     os << "Partial VBitmap" << "):";
 
     os << std::endl;
@@ -265,8 +265,3 @@ operator >> (std::istream &is, pageSlice &rpsv)
         return is;
   }
 } //namespace ns3
-
-
-
-
-

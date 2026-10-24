@@ -118,7 +118,7 @@ public:
    * Start beacon transmission immediately.
    */
   void StartBeaconing (void);
-  
+
   uint32_t GetStaType (void) const;
   uint32_t GetChannelWidth (void) const;
   void SetChannelWidth (uint32_t width);
@@ -146,9 +146,13 @@ public:
 
 
 private:
+  friend class ApRawPageScheduleCheck;
+  friend class ApRepeatedAssociationCheck;
   virtual void Receive (Ptr<Packet> packet, const WifiMacHeader *hdr);
 
   void OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot);
+  void OnBeaconPhyTxEnd (Ptr<const Packet> packet);
+  void ScheduleRawAccess (RPS rps, uint16_t rpsIndex, Time delay);
 
   /**
    * The packet we sent was successfully received by the receiver
@@ -243,7 +247,7 @@ private:
    * \return true if beacons are periodically generated, false otherwise
    */
   bool GetBeaconGeneration (void) const;
-    
+
   void SetRawGroupInterval (uint32_t interval);
   uint32_t GetRawGroupInterval (void) const;
   void SetSlotFormat (uint32_t format);
@@ -256,20 +260,23 @@ private:
   uint32_t GetSlotNum (void) const;
 
   Time GetSlotStartTimeFromAid (uint16_t aid) const;
+  uint32_t GetRawPageRpsIndex (uint8_t page) const;
+  Time GetNextRawPageBeaconDelay (uint16_t aid) const;
   void SetPageSlicingActivated (bool activate);
   bool GetPageSlicingActivated (void) const;
 
   RPSVector m_rpsset;
   pageSlice m_pageslice;
   TIM m_TIM;
+  bool m_rotateRawPages;
   void SetTotalStaNum (uint32_t num);
   uint32_t GetTotalStaNum (void) const;
-    
+
   typedef std::vector<ns3::RPS *>::iterator RPSlistCI;
-    
+
   virtual void DoDispose (void);
   virtual void DoInitialize (void);
-  
+
   TracedCallback<Ptr<const Packet>, Mac48Address, bool, bool, Time> m_packetToTransmitReceivedFromUpperLayer;
   TracedCallback<uint16_t,uint16_t> m_rawSlotStarted;
   TracedValue<uint16_t> m_rpsIndexTrace;
@@ -285,7 +292,7 @@ private:
   uint32_t m_slotDurationCount;
   uint32_t m_slotNum;
   uint32_t m_channelWidth;
-  
+
   //TIM
   uint8_t m_DTIMCount; //!< DTIM Count
   uint8_t m_DTIMPeriod; //!< DTIM Period
@@ -301,13 +308,13 @@ private:
   uint8_t m_blockbitmap_trail;
   //Page slice
   uint32_t m_pagebitmap;
-    
+
   std::vector<uint16_t> m_sensorList; //stations allowed to transmit in last beacon
   std::vector<uint16_t> m_OffloadList;
   std::vector<uint16_t> m_receivedAid;
   std::map<uint16_t, Mac48Address> m_AidToMacAddr;
   std::map<Mac48Address, bool> m_accessList;
-    
+
   std::map<Mac48Address, bool> m_sleepList;
   std::map<Mac48Address, bool> m_supportPageSlicingList;
 

@@ -1,4 +1,6 @@
+#include "src/wifi/model/association-diagnostics.h"
 #include "NodeEntry.h"
+#include <fstream>
 #include "src/wifi/model/extension-headers.h"
 #include "src/wifi/model/sta-wifi-mac.h"
 
@@ -7,6 +9,33 @@ using namespace std;
 
 NS_LOG_COMPONENT_DEFINE ("NodeEntry");
 bool showLog = false;
+namespace {
+std::ofstream applicationEvents;
+void RecordApplicationEvent(const char* event, int staIndex, uint32_t aid,
+                            Ptr<const Packet> packet, const SeqTsHeader& header) {
+    if (!applicationEvents.is_open()) return;
+    applicationEvents << Simulator::Now().GetNanoSeconds() << ',' << event << ','
+        << staIndex << ',' << aid << ',' << header.GetSeq() << ','
+        << header.GetTs().GetNanoSeconds() << ',' << packet->GetUid() << ','
+        << packet->GetSize() << '\n';
+    NS_ABORT_MSG_IF(!applicationEvents, "Cannot write application events");
+}
+}
+
+void NodeEntry::OpenApplicationEvents(const std::string& prefix) {
+    if (prefix.empty()) return;
+    applicationEvents.open((prefix + "-app-events.csv").c_str());
+    NS_ABORT_MSG_IF(!applicationEvents, "Cannot open application events");
+    applicationEvents << "time_ns,event,sta_index,aid,app_seq,request_ts_ns,packet_uid,packet_bytes\n";
+}
+
+void NodeEntry::CloseApplicationEvents() {
+    if (!applicationEvents.is_open()) return;
+    applicationEvents.flush();
+    NS_ABORT_MSG_IF(!applicationEvents, "Cannot flush application events");
+    applicationEvents.close();
+    NS_ABORT_MSG_IF(applicationEvents.fail(), "Cannot close application events");
+}
 Time NodeEntry::maxLatency = Time::Min();
 Time NodeEntry::minLatency = Time::Max();
 Time NodeEntry::minJitter = Time::Max();
@@ -20,10 +49,7 @@ void NodeEntry::SetAssociation(std::string context, Mac48Address address) {
 	this->isAssociated = true;
 
 	// determine AID
-	auto matches = Config::LookupMatches(
-			"/NodeList/" + std::to_string(this->id)
-	+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::StaWifiMac/");
-	auto obj = matches.Get(0)->GetObject<StaWifiMac>();
+	auto obj = DynamicCast<WifiNetDevice>(device)->GetMac()->GetObject<StaWifiMac>();
 	this->aId = obj->GetAID();
 
 	//cout << "Associated with aId " << this->aId;
@@ -473,6 +499,8 @@ void NodeEntry::OnUdpPacketSent(Ptr<const Packet> packet) { //works
 
 	SeqTsHeader seqTs;
 	pCopy->RemoveHeader(seqTs);
+    HALOW_DIAG(Mac48Address::ConvertFrom(device->GetAddress()), "app_request_tx", "uid=" << packet->GetUid() << " aid=" << aId << " app_seq=" << seqTs.GetSeq());
+    RecordApplicationEvent("request_tx", id, aId, packet, seqTs);
 	auto timeDiff = (Simulator::Now() - seqTs.GetTs());
 	if (this->id == 90)
 		cout << "++++++++++++++++++++++++++++++++++++++++++++++ TX at " << Simulator::Now() << "seq " << seqTs.GetSeq() << endl;
@@ -496,6 +524,8 @@ void NodeEntry::OnUdpEchoPacketReceived(Ptr<const Packet> packet, Address from) 
 	try {
 		SeqTsHeader seqTs;
 		pCopy->RemoveHeader(seqTs);
+    HALOW_DIAG(Mac48Address::ConvertFrom(device->GetAddress()), "app_echo_rx", "uid=" << packet->GetUid() << " aid=" << aId << " app_seq=" << seqTs.GetSeq());
+    RecordApplicationEvent("echo_rx", id, aId, packet, seqTs);
 		auto timeDiff = (Simulator::Now() - seqTs.GetTs());
 		if (seqTs.GetSeq() > 0)
 			stats->get(this->id).NumberOfSuccessfulRoundtripPacketsWithSeqHeader++;
@@ -586,6 +616,8 @@ void NodeEntry::OnUdpPacketReceivedAtAP(Ptr<const Packet> packet) {
 
 		SeqTsHeader seqTs;
 		pCopy->RemoveHeader(seqTs);
+    HALOW_DIAG(Mac48Address::ConvertFrom(device->GetAddress()), "app_ap_rx", "uid=" << packet->GetUid() << " aid=" << aId << " app_seq=" << seqTs.GetSeq());
+    RecordApplicationEvent("ap_rx", id, aId, packet, seqTs);
 		auto timeDiff = (Simulator::Now() - seqTs.GetTs());
 
 		//cout << "[" << this->id << "] " << "UDP packet received at AP after "
@@ -758,4 +790,3 @@ void NodeEntry::UpdateQueueLength() {
 
 NodeEntry::~NodeEntry() {
 }
-

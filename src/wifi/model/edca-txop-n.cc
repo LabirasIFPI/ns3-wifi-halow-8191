@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2006, 2009 INRIA
@@ -500,6 +501,7 @@ void
 EdcaTxopN::SetaccessList (std::map<Mac48Address, bool> list)
 {
     m_accessList = list;
+    RestartAccessIfNeeded ();
 }
 
 void
@@ -509,9 +511,38 @@ EdcaTxopN::SetsleepList (std::map<Mac48Address, bool> list)
 }
 
 void
+EdcaTxopN::WritePendingDiagnostics (std::ostream &out) const
+{
+  out << "EDCA_FINAL access_if_raw=" << AccessIfRaw
+      << " current=" << (m_currentPacket != 0) << "\n";
+  if (m_currentPacket)
+    out << "EDCA_CURRENT to=" << m_currentHdr.GetAddr1 ()
+        << " uid=" << m_currentPacket->GetUid ()
+        << " seq=" << m_currentHdr.GetSequenceNumber ()
+        << " retry=" << m_currentHdr.IsRetry () << "\n";
+  m_queue->WritePendingDiagnostics (out);
+}
+
+void
 EdcaTxopN::NotifyAccessGranted (void)
 {
   NS_LOG_FUNCTION (this);
+  const auto destinationAllowed = [this] (const WifiMacHeader &header) {
+    if (header.GetAddr1 ().IsGroup ()) return true;
+    if (!m_accessList.empty ())
+      {
+        const auto entry = m_accessList.find (header.GetAddr1 ());
+        if (entry == m_accessList.end () || !entry->second)
+          {
+            HALOW_DIAG (header.GetAddr1 (), "edca_block_raw", "from=" << header.GetAddr2 () << " seq=" << header.GetSequenceNumber ());
+            return false;
+          }
+      }
+    const auto sleeper = m_sleepList.find (header.GetAddr1 ());
+    if (sleeper != m_sleepList.end () && sleeper->second)
+      HALOW_DIAG (header.GetAddr1 (), "edca_block_sleep", "from=" << header.GetAddr2 () << " seq=" << header.GetSequenceNumber ());
+    return sleeper == m_sleepList.end () || !sleeper->second;
+  };
   //Time remainingRawTime = m_rawDuration - (Simulator::Now() - m_rawStartedAt);
   if (!AccessIfRaw)
     {
@@ -520,6 +551,15 @@ EdcaTxopN::NotifyAccessGranted (void)
    //NS_LOG_UNCOND ("EdcaTxopN::NotifyAccessGranted, " << Simulator::Now ()<< ", " << m_low->GetAddress ());
     int newdata=99;
     m_AccessQuest_record (Simulator::Now ().GetMicroSeconds (), newdata);
+  // A pending unicast retry for a destination outside its current window must not
+  // block other destinations. Park it at the queue head: it stays visible to the
+  // AP TIM builder (HasPacketsInQueueTo) and keeps its sequence number/Retry bit.
+  if (m_currentPacket != 0 && m_currentHdr.IsData () && !m_currentHdr.GetAddr1 ().IsGroup ()
+      && m_fragmentNumber == 0 && !destinationAllowed (m_currentHdr))
+    {
+      m_queue->PushFront (m_currentPacket, m_currentHdr);
+      m_currentPacket = 0;
+    }
   if (m_currentPacket == 0)
     {
       if (m_queue->IsEmpty () && !m_baManager->HasPackets ())
@@ -536,9 +576,10 @@ EdcaTxopN::NotifyAccessGranted (void)
       m_currentPacket = m_baManager->GetNextPacket (m_currentHdr);
       if (m_currentPacket == 0)
         {
-          if (m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations) == 0)
+          if (m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations, destinationAllowed) == 0)
             {
               NS_LOG_DEBUG ("no available packets in the queue");
+              m_dcf->StartBackoffNow (m_rng->GetNext (0, m_dcf->GetCw ()));
               return;
             }
           if (m_currentHdr.IsQosData () && !m_currentHdr.GetAddr1 ().IsBroadcast ()
@@ -549,27 +590,18 @@ EdcaTxopN::NotifyAccessGranted (void)
               return;
             }
 
-          //temporary, should be removed when ps-poll is suported
-          //Ptr<const Packet> PacketTest = m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
-          
-          //while (1)
-           // {
-              if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
-              // no sleep 
-                {
-            	  return;
-                }
-
-             //}
           // TODO implement restrictions regarding non-Cross slot boundary
-          m_currentPacket = m_queue->DequeueFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
+          m_currentPacket = m_queue->DequeueFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations, destinationAllowed);
           NS_ASSERT (m_currentPacket != 0);
 
-          uint16_t sequence = m_txMiddle->GetNextSequenceNumberfor (&m_currentHdr);
-          m_currentHdr.SetSequenceNumber (sequence);
+          if (!m_currentHdr.IsRetry ())
+            {
+              uint16_t sequence = m_txMiddle->GetNextSequenceNumberfor (&m_currentHdr);
+              m_currentHdr.SetSequenceNumber (sequence);
+              m_currentHdr.SetNoRetry ();
+            }
           m_currentHdr.SetFragmentNumber (0);
           m_currentHdr.SetNoMoreFragments ();
-          m_currentHdr.SetNoRetry ();
           m_fragmentNumber = 0;
           NS_LOG_DEBUG ("dequeued size=" << m_currentPacket->GetSize () <<
                         ", to=" << m_currentHdr.GetAddr1 () <<
@@ -580,6 +612,8 @@ EdcaTxopN::NotifyAccessGranted (void)
             }
         }
     }
+  // A pending retry must obey the current destination window as well.
+  if (!destinationAllowed (m_currentHdr)) return;
   MacLowTransmissionParameters params;
   params.DisableOverrideDurationId ();
   if (m_currentHdr.GetAddr1 ().IsGroup () || m_currentHdr.IsPsPoll ())
@@ -662,16 +696,16 @@ EdcaTxopN::NotifyAccessGranted (void)
                               }
                               //temporary double check in order to not start the transmission if not my slot or shared slot
                             if(!m_low->GetPhy()->IsStateSleep())
-                           {  
+                           {
                               m_low->StartTransmission (fragment, &m_currentHdr,
                                                    params, m_transmissionListener);
                               nrOfTransmissionsDuringRaw++;
                             }
                           }
                       //}
-                        //m_low->StartTransmission (fragment, &hdr, params, m_transmissionListener);     
+                        //m_low->StartTransmission (fragment, &hdr, params, m_transmissionListener);
       }
-      
+
       else
         {
           WifiMacHeader peekedHdr;
@@ -729,7 +763,7 @@ EdcaTxopN::NotifyAccessGranted (void)
               NS_LOG_DEBUG ("tx unicast");
             }
           params.DisableNextData ();
-          
+
           /*Time txDuration = m_low->CalculateTransmissionTime(m_currentPacket,
                          			&m_currentHdr, params);
 	      if (!m_crossSlotBoundaryAllowed && txDuration > remainingRawTime) { // don't transmit if it can't be done inside RAW window, the ACK won't be received anyway
@@ -757,9 +791,9 @@ EdcaTxopN::NotifyAccessGranted (void)
                         m_low->StartTransmission (m_currentPacket, &m_currentHdr, params, m_transmissionListener);
                         nrOfTransmissionsDuringRaw++;
                         }
-                  }   
+                  }
               //}
-          
+
           if (!GetAmpduExist ())
             {
               CompleteTx ();
@@ -943,7 +977,7 @@ EdcaTxopN::GotAck (double snr, WifiMode txMode)
         //NS_LOG_UNCOND ("the queue is empty");
         //callback SleepIfQueueIsEmpty
         //NS_LOG_UNCOND ("go to sleep true" << m_low->GetAddress());
-        m_sleepCallback (true);        
+        m_sleepCallback (true);
     }
 }
 
@@ -961,7 +995,7 @@ EdcaTxopN::MissedAck (void)
         //NS_LOG_UNCOND ("the queue is empty");
         //callback SleepIfQueueIsEmpty
         //NS_LOG_UNCOND ("go to sleep true" << m_low->GetAddress());
-        m_sleepCallback (true);        
+        m_sleepCallback (true);
     }
       m_stationManager->ReportFinalDataFailed (m_currentHdr.GetAddr1 (), &m_currentHdr);
       if (!m_txFailedCallback.IsNull ())
@@ -1008,7 +1042,7 @@ EdcaTxopN::MissedAck (void)
           //If retransmit, shouldn't go to sleep if my slot
           //but should go to sleep if not my slot
           //NS_LOG_UNCOND ("go to sleep false retransmit " << m_low->GetAddress());
-          
+
           m_sleepCallback (false);
         }
       m_currentHdr.SetRetry ();
@@ -1103,7 +1137,7 @@ EdcaTxopN::AccessAllowedIfRaw (bool allowed)
     {
          NS_LOG_UNCOND ("EdcaTxopN::NotifyAccessGranted, " << Simulator::Now () << ", " << allowed << ", " << m_low->GetAddress ());
     }*/
-    
+
 }
 
 void

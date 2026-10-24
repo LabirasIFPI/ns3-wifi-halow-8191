@@ -1,3 +1,4 @@
+#include "ns3/abort.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2006 INRIA
@@ -23,11 +24,12 @@
 #include "ns3/log.h" //for test
 
 namespace ns3 {
-    
+
 	NS_LOG_COMPONENT_DEFINE ("TIM");
 
 TIM::EncodedBlock::EncodedBlock ()
 {
+  m_blockcontrol = 0;
 }
 
 TIM::EncodedBlock::~EncodedBlock ()
@@ -146,6 +148,13 @@ TIM::EncodedBlock::Is (uint8_t info, uint8_t n)
 TIM::TIM ()
 {
   m_length = 0;
+  m_DTIMCount = 0;
+  m_DTIMPeriod = 1;
+  m_BitmapControl = 0;
+  m_TrafficIndicator = 0;
+  m_PageSliceNum = 0;
+  m_PageIndex = 0;
+  m_partialVBitmap = m_partialVBitmap_arrary;
 }
 
 TIM::~TIM ()
@@ -157,7 +166,7 @@ TIM::SetDTIMCount (uint8_t count)
 {
   m_DTIMCount = count;
 }
-    
+
 void
 TIM::SetDTIMPeriod (uint8_t count)
 {
@@ -174,30 +183,35 @@ TIM::SetBitmapControl (uint8_t control)
 }
 
 
-void 
+void
 TIM::SetTafficIndicator (uint8_t control)
 {
    NS_ASSERT (control <= 1);
    m_TrafficIndicator = control;
+   m_BitmapControl = (m_BitmapControl & 0xfe) | control;
 }
 
 void
 TIM::SetPageSliceNum (uint8_t control)
 {
    NS_ASSERT (control <= 31);
-   m_PageSliceNum = control; 
+   m_PageSliceNum = control;
+   m_BitmapControl = (m_BitmapControl & 0xc1) | (control << 1);
 }
 
-void 
+void
 TIM::SetPageIndex (uint8_t control)
 {
    NS_ASSERT (control <= 3);
    m_PageIndex = control;
+   m_BitmapControl = (m_BitmapControl & 0x3f) | (control << 6);
 }
-  
+
 void
 TIM::SetPartialVBitmap (TIM::EncodedBlock block)
 {
+  NS_ABORT_MSG_IF (static_cast<unsigned>(m_length) + block.GetSize() > sizeof(m_partialVBitmap_arrary),
+                   "TIM bitmap exceeds 251 bytes; use a supported slicing/coding profile");
   m_encodeblock = block;
   uint8_t offset = m_encodeblock.GetBlockOffset ();
   uint8_t control = m_encodeblock.GetBlockControl ();
@@ -205,7 +219,7 @@ TIM::SetPartialVBitmap (TIM::EncodedBlock block)
   uint8_t offcont = ((offset << 3) & 0xf8) | (control & 0x07);
   m_partialVBitmap_arrary[m_length] = offcont;
   m_length++;
-  
+
   m_partialVBitmap_arrary[m_length] = m_encodeblock.GetBlockBitmap ();
   m_length++;
   NS_LOG_DEBUG ("Block Bitmap = " << (int)m_encodeblock.GetBlockBitmap ());
@@ -248,12 +262,12 @@ TIM::GetBitmapControl (void) const
 uint8_t
 TIM::GetTrafficIndicator  (void) const
 {
-    return m_TrafficIndicator; 
+    return m_TrafficIndicator;
 }
 uint8_t
 TIM::GetPageSliceNum  (void) const
 {
-    return m_PageSliceNum; 
+    return m_PageSliceNum;
 }
 
 uint8_t
@@ -265,7 +279,7 @@ TIM::GetPageIndex(void) const
 uint8_t *
 TIM::GetPartialVBitmap (void) const
 {
-  return m_partialVBitmap;
+  return const_cast<uint8_t *>(m_partialVBitmap_arrary);
 }
 
 WifiInformationElementId
@@ -293,7 +307,7 @@ TIM::SerializeInformationField (Buffer::Iterator start) const
  if (m_BitmapControl || m_length != 0)
    {
      start.WriteU8 (m_BitmapControl);
-     start.Write (m_partialVBitmap, m_length);
+     start.Write (m_partialVBitmap_arrary, m_length);
      NS_LOG_DEBUG ("Bitmap Control field is " << (int)m_BitmapControl);
      NS_LOG_DEBUG ("Length of Partial Virtual Bitmap is " << (int)m_length);
    }
@@ -303,6 +317,8 @@ uint8_t
 TIM::DeserializeInformationField (Buffer::Iterator start, uint8_t length)
 {
   NS_LOG_FUNCTION (this << length);
+  NS_ABORT_MSG_IF (length < 2 || (length > 2 && length - 3 > sizeof(m_partialVBitmap_arrary)),
+                   "Invalid TIM information field length");
   m_DTIMCount = start.ReadU8 ();
   m_DTIMPeriod = start.ReadU8 ();
   if (length > 2)
@@ -339,8 +355,3 @@ ATTRIBUTE_HELPER_CPP (TIM);
     }
 
 } //namespace ns3
-
-
-
-
-

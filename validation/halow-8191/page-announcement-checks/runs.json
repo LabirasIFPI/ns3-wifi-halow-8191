@@ -1,0 +1,89 @@
+[
+  {
+    "case": "rotate",
+    "exit_code": 0,
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--ulimit",
+      "core=0",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "ns3-halow-env",
+      "timeout",
+      "15",
+      "env",
+      "LD_LIBRARY_PATH=/workspace/IEEE-802.11ah-ns-3/build",
+      "./build/scratch/raw-page-beacon-check"
+    ]
+  },
+  {
+    "case": "legacy",
+    "exit_code": 0,
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--ulimit",
+      "core=0",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "ns3-halow-env",
+      "timeout",
+      "15",
+      "env",
+      "LD_LIBRARY_PATH=/workspace/IEEE-802.11ah-ns-3/build",
+      "./build/scratch/raw-page-beacon-check",
+      "--rotate=0"
+    ]
+  },
+  {
+    "case": "mixed",
+    "exit_code": 134,
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--ulimit",
+      "core=0",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "ns3-halow-env",
+      "timeout",
+      "15",
+      "env",
+      "LD_LIBRARY_PATH=/workspace/IEEE-802.11ah-ns-3/build",
+      "./build/scratch/raw-page-beacon-check",
+      "--mixedPages=1"
+    ]
+  },
+  {
+    "case": "period",
+    "exit_code": 134,
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--ulimit",
+      "core=0",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "ns3-halow-env",
+      "timeout",
+      "15",
+      "env",
+      "LD_LIBRARY_PATH=/workspace/IEEE-802.11ah-ns-3/build",
+      "./build/scratch/raw-page-beacon-check",
+      "--wrongPeriod=1"
+    ]
+  }
+]

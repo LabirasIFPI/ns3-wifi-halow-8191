@@ -108,6 +108,7 @@ public:
     /*void SetPageSlicingSupported (uint8_t support);
     uint8_t GetPageSlicingSupported (void) const;*/
 private:
+  friend class StaWholePageSleepCheck; // Focused PHY sleep/wake regression check.
     uint32_t m_staType;
     uint32_t m_channelWidth;
     Time m_currentslotDuration;
@@ -206,6 +207,7 @@ private:
    * \param value the new state
    */
   void SetState (enum MacState value);
+  void TraceAssociationDiagnostic (const char* event);
   /**
    * Return the HT capability of the current AP.
    *
@@ -232,7 +234,7 @@ private:
   void OutsideRawStartBackoff (void);
   bool Is(uint8_t blockbitmap, uint8_t j);
   void InsideBackoff (void);
-  void RawSlotStartBackoff (void);  
+  void RawSlotStartBackoff (void);
   void RawSlotStartBackoffPostpone (void);
   uint32_t GetSelfPageSliceNum (void);
 
@@ -240,7 +242,7 @@ private:
   void ClearDataBuffered (void);
   void SetInRAWgroup(void);
   void UnsetInRAWgroup(void);
-  
+
    /**
    * wake up operation
    */
@@ -252,10 +254,10 @@ private:
 
   TracedValue<uint16_t> nrOfTransmissionsDuringRAWSlot = 0;
   bool IsInPagebitmap (uint8_t block);
-  
+
   void GoToSleepNextTIM (S1gBeaconHeader beacon);
   void GoToSleepCurrentTIM (S1gBeaconHeader beacon);
-  void GoToSleep(Time  sleeptime); 
+  void GoToSleep(Time  sleeptime);
 
   Time m_lastRawDurationus;
   Time m_lastRawStart;
@@ -269,6 +271,7 @@ private:
   EventId m_outsideRawEvent;
   EventId m_insideBackoffEvent;
   enum MacState m_state;
+  bool m_haveTimPageSlice = false; // Non-DTIM beacons omit this element.
   Time m_probeRequestTimeout;
   Time m_assocRequestTimeout;
   EventId m_probeRequestEvent;
@@ -282,12 +285,12 @@ private:
   uint16_t fastAssocThreshold;
     uint16_t assocVaule;
   uint8_t m_slotCrossBoundary;
-    
+
   bool firstBeacon;
-  bool receivingBeacon;  
-  EventId m_beaconWakeUpEvent; 
+  bool receivingBeacon;
+  EventId m_beaconWakeUpEvent;
   Time beaconInterval;
-  uint64_t timeDifferenceBeacon;  
+  uint64_t timeDifferenceBeacon;
   uint64_t timeBeacon;
   bool outsideraw;
   bool stationrawslot;
@@ -296,22 +299,22 @@ private:
   bool m_activeProbing;
   Ptr<DcaTxop> m_pspollDca;  //!< Dedicated DcaTxop for beacons
   virtual void DoDispose (void);
-  
+
   TIM m_TIM;
   uint8_t m_DTIMCount; //!< DTIM Count
   uint8_t m_DTIMPeriod; //!< DTIM Period
   uint8_t m_TrafficIndicator;
   uint8_t m_PageSliceNum;
   uint8_t m_PageIndex;
-          
-  pageSlice m_pageSlice;   
+
+  pageSlice m_pageSlice;
   uint8_t m_PagePeriod;
   uint8_t m_Pageindex_slice; // page index from page slice element, different from page index in TIM element
   uint8_t m_Pageindex;
   uint8_t m_PageSliceLen;
   uint8_t m_PageSliceCount;
   uint8_t m_BlockOffset;
-  uint8_t m_TIMOffset;  
+  uint8_t m_TIMOffset;
   uint8_t m_PageBitmap[4];
   uint8_t m_PageBitmapLen;
   uint8_t m_TIMSeq;  // 0 for DTIM ???
@@ -323,7 +326,7 @@ private:
   uint8_t m_selfPage;
   uint8_t m_selfSubBlock;
   uint8_t m_selfAid;
-  
+
   uint8_t m_supportsPageSlicing;
 
   Time m_maxTimeInQueue;

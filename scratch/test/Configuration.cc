@@ -1,7 +1,7 @@
 #include "Configuration.h"
 
 Configuration::Configuration() {
-    
+
 }
 
 Configuration::Configuration(int argc, char *argv[]) {
@@ -11,9 +11,9 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("CoapPayloadSize", "Size of CoAP payload",coapPayloadSize);
      */
     cmd.AddValue("seed", "random seed", seed);
-    cmd.AddValue("simulationTime", "Simulation time in seconds", simulationTime);
-    cmd.AddValue("Nsta", "number of total stations", Nsta);
-    cmd.AddValue("NRawSta", "number of stations supporting RAW. If -1 it will be based on NSta, should be divisible by NGroup", NRawSta);
+    cmd.AddValue("simulationTime", "Traffic window in seconds after all stations associate", simulationTime);
+    cmd.AddValue("Nsta", "Total stations; 0 infers contiguous AIDs from RAW", Nsta);
+    cmd.AddValue("NRawSta", "Expected unique RAW stations; -1 infers from RAW", NRawSta);
     cmd.AddValue ("payloadSize", "Size of payload to send in bytes", payloadSize);
     cmd.AddValue("BeaconInterval", "Beacon interval time in us", BeaconInterval);
     cmd.AddValue("DataMode", "Date mode (check MCStoWifiMode for more details) (format: MCSbw_mcs, e.g. MCS1_0 is OfdmRate300KbpsBW1Mhz)", DataMode);
@@ -35,6 +35,7 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("blockOffset", "The 1st page slice starts with the block with blockOffset", blockOffset);
     cmd.AddValue("timOffset", "Offset in number of Beacon Intervals from the DTIM that carries the first page slice of the page", timOffset);
     cmd.AddValue("TrafficInterval", "Traffic interval time in ms", trafficInterval);
+    cmd.AddValue("TrafficStartSpread", "Random UDP Echo client start spread in ms; UINT32_MAX uses TrafficInterval", trafficStartSpread);
     cmd.AddValue("Outputpath", "files path of each stations", OutputPath);
 
 /*
@@ -95,5 +96,14 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("CoolDownPeriod", "Period of no more traffic generation after simulation time (to allow queues to be processed) in seconds", CoolDownPeriod);
 */
 
+    // Headless audit runs must not depend on a visualizer connection.
+    cmd.AddValue("VisualizerIP", "Visualizer host; use none for headless runs", visualizerIP);
+    cmd.AddValue("ValidateRawOnly", "Validate RAW fields and population, then exit without simulation", ValidateRawOnly);
+    cmd.AddValue("RotateRawPages", "Rotate whole TIM pages with RPS; derives pagePeriod from RPS count", RotateRawPages);
+    cmd.AddValue("AssociationTimeout", "Deadline for all associations in simulated seconds", AssociationTimeout);
+    cmd.AddValue("CoolDownPeriod", "Seconds to drain queues after the traffic window", CoolDownPeriod);
+    cmd.AddValue("TrafficPackets", "Maximum UDP echo requests per station", TrafficPackets);
+    cmd.AddValue("ResultPrefix", "Output prefix; parent directory must exist", ResultPrefix);
+    cmd.AddValue("StatisticsInterval", "Statistics sampling interval in seconds", visualizerSamplingInterval);
     cmd.Parse(argc, argv);
 }

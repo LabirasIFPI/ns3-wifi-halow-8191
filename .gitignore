@@ -1,0 +1,55 @@
+# Builds e estado do Waf
+/build/
+/build-*/
+/.waf-*/
+/.waf3-*/
+/.lock-waf_*
+*.py[co]
+__pycache__/
+
+# Resultados brutos: preservados localmente e publicados como artefatos
+/results/
+
+# Pacotes gerados e snapshots volumosos
+/validation/halow-8191/pacotes/
+/validation/halow-8191/closure-2026-10-17/sources-current.tar.gz
+
+# Material interno de trabalho; relatórios atuais permanecem versionados
+/validation/conversa2.md
+/validation/halow-8191/documentacao/historico/
+/validation/halow-8191/documentacao/notion/
+/validation/halow-8191/historico/
+/validation/halow-8191/closure-2026-10-17/
+/validation/halow-8191/ORGANIZACAO_2026-10-20.json
+/validation/halow-8191/MAPA_DE_ARQUIVOS.csv
+/validation/halow-8191/ATUALIZACAO_SEEDS_2026-10-20.md
+/validation/halow-8191/CONTEXTO_PARA_RETOMADA_2026-10-17.md
+/validation/halow-8191/INTEGRACAO.md
+/validation/halow-8191/RELATORIO_FINAL_2026-10-17.md
+
+# Cenário paralelo preservado no workspace, fora da validação 8.191
+/arvore-halow*.xml
+/arvore-halow*.csv
+/scratch/arvore-relays.cc
+/scratch/arvore-relays.md
+/scratch/halow_sim/
+/OptimalRawGroup/RawConfig-star10.txt
+/OptimalRawGroup/moreinfo.txt
+
+# Saídas comuns do ns-3
+*.pcap
+*.tr
+*.dat
+*.plt
+*.cwnd
+*.mob
+*.routes
+*.log
+
+# Editor e sistema
+*~
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/

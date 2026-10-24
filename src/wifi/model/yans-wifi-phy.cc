@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006 INRIA
@@ -588,6 +589,8 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
   //Note: plcp preamble reception is not yet modeled.
   //NS_LOG_UNCOND (packet << "\t" << rxPowerDbm << " dbm " << "\t" << txVector.GetMode () << "\t" << packet->GetSize ()); //test
   NS_LOG_FUNCTION (this << packet << rxPowerDbm << txVector.GetMode () << preamble << (uint32_t)packetType);
+  HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_arrival", "state=" << m_state->GetState () << " power_dbm=" << rxPowerDbm);
+  HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_arrival", "state=" << m_state->GetState () << " power_dbm=" << rxPowerDbm);
   AmpduTag ampduTag;
   rxPowerDbm += m_rxGainDb;
   double rxPowerW = DbmToW (rxPowerDbm);
@@ -605,6 +608,8 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
     {
     case YansWifiPhy::SWITCHING:
       NS_LOG_DEBUG ("drop packet because of channel switching");
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
       NotifyRxDrop (packet);
       m_plcpSuccess = false;
       /*
@@ -625,6 +630,8 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
     case YansWifiPhy::RX:
       NS_LOG_DEBUG ("drop packet because already in Rx (power=" <<
                     rxPowerW << "W)");
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
       NotifyRxDrop (packet);
       if (endRx > Simulator::Now () + m_state->GetDelayUntilIdle ())
         {
@@ -636,6 +643,8 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
     case YansWifiPhy::TX:
       NS_LOG_DEBUG ("drop packet because already in Tx (power=" <<
                     rxPowerW << "W)");
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
       NotifyRxDrop (packet);
       if (endRx > Simulator::Now () + m_state->GetDelayUntilIdle ())
         {
@@ -646,21 +655,25 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
       break;
     case YansWifiPhy::CCA_BUSY:
     case YansWifiPhy::IDLE:
-      
+
       //NS_LOG_UNCOND ("rxPowerW " << rxPowerW << "\t" << ",m_edThresholdW " << m_edThresholdW << "," << packet);
-            
+
       if (rxPowerW > m_edThresholdW) //checked here, no need to check in the payload reception (current implementation assumes constant rx power over the packet duration)
         {
           if (preamble == WIFI_PREAMBLE_NONE && m_mpdusNum == 0)
             {
               NS_LOG_DEBUG ("drop packet because no preamble has been received");
-              NotifyRxDrop (packet);
+              HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+              HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      NotifyRxDrop (packet);
               goto maybeCcaBusy;
             }
           else if (preamble == WIFI_PREAMBLE_NONE && m_plcpSuccess == false) //A-MPDU reception fails
             {
               NS_LOG_DEBUG ("Drop MPDU because no plcp has been received");
-              NotifyRxDrop (packet);
+              HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+              HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      NotifyRxDrop (packet);
               goto maybeCcaBusy;
             }
           else if (preamble != WIFI_PREAMBLE_NONE && packet->PeekPacketTag (ampduTag) && m_mpdusNum == 0)
@@ -711,13 +724,17 @@ YansWifiPhy::StartReceivePreambleAndHeader (Ptr<Packet> packet,
                         rxPowerW << "<" << m_edThresholdW << ")");
             //NS_LOG_UNCOND ("drop packet because signal power too Small (" <<
             //              rxPowerW << "<" << m_edThresholdW << ")");
-          NotifyRxDrop (packet);
+          HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+          HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      NotifyRxDrop (packet);
           m_plcpSuccess = false;
           goto maybeCcaBusy;
         }
       break;
     case YansWifiPhy::SLEEP:
       NS_LOG_DEBUG ("drop packet because in sleep mode");
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
       NotifyRxDrop (packet);
       m_plcpSuccess = false;
       break;
@@ -767,13 +784,17 @@ YansWifiPhy::StartReceivePacket (Ptr<Packet> packet,
         {
           NS_LOG_DEBUG ("drop packet because it was sent using an unsupported mode (" << txMode << ")");
           //NS_LOG_UNCOND ("drop packet because it was sent using an unsupported mode (" << txMode << ")");
-          NotifyRxDrop (packet);
+          HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+          HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      NotifyRxDrop (packet);
           m_plcpSuccess = false;
         }
     }
   else   //plcp reception failed
     {
       NS_LOG_DEBUG ("drop packet because plcp preamble/header reception failed");
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
       NotifyRxDrop (packet);
       m_plcpSuccess = false;
     }
@@ -1000,21 +1021,21 @@ YansWifiPhy::Configure80211n (void)
       m_deviceMcsSet.push_back (i);
     }
 }
-    
+
 void
 YansWifiPhy::Configure80211ah (void)
 {
     NS_LOG_FUNCTION (this);
     m_channelStartingFrequency = 9e2;
-    
+
     // need to check for 802.11ah
     //m_deviceRateSet.push_back (WifiPhy::GetOfdmRate6Mbps ());
     //m_deviceRateSet.push_back (WifiPhy::GetOfdmRate300KbpsBW1MHz ());
     //m_deviceRateSet.push_back (WifiPhy::GetOfdmRate650KbpsBW2MHz ());
-    
+
     //m_deviceRateSet.push_back (WifiPhy::GetOfdmRate12Mbps ());
     //m_deviceRateSet.push_back (WifiPhy::GetOfdmRate24Mbps ());
-        
+
     if (GetChannelWidth () == 2)
     {
     m_deviceRateSet.push_back (WifiPhy::GetOfdmRate300KbpsBW1MHz ());
@@ -1030,7 +1051,7 @@ YansWifiPhy::Configure80211ah (void)
 
     //supportedmodes.push_back (WifiPhy::GetOfdmRate150KbpsBW1MHz ());
     //mandatory MCS 0 to 7, 2Mhz
-    
+
     m_deviceRateSet.push_back (WifiPhy::GetOfdmRate650KbpsBW2MHz ());
     m_deviceRateSet.push_back (WifiPhy::GetOfdmRate1_3MbpsBW2MHz ());
     m_deviceRateSet.push_back (WifiPhy::GetOfdmRate1_95MbpsBW2MHz ());
@@ -1066,10 +1087,10 @@ YansWifiPhy::Configure80211ah (void)
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate3MbpsBW1MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate3_6MbpsBW1MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate4MbpsBW1MHz ());
-       
+
        //supportedmodes.push_back (WifiPhy::GetOfdmRate150KbpsBW1MHz ());
        //mandatory MCS 0 to 7, 2Mhz
-       
+
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate650KbpsBW2MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate1_3MbpsBW2MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate1_95MbpsBW2MHz ());
@@ -1079,7 +1100,7 @@ YansWifiPhy::Configure80211ah (void)
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate5_85MbpsBW2MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate6_5MbpsBW2MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate7_8MbpsBW2MHz ());
-       
+
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate1_35MbpsBW4MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate2_7MbpsBW4MHz ());
        m_deviceRateSet.push_back (WifiPhy::GetOfdmRate4_05MbpsBW4MHz ());
@@ -1232,6 +1253,8 @@ YansWifiPhy::EndReceive (Ptr<Packet> packet, enum WifiPreamble preamble, uint8_t
 
   struct InterferenceHelper::SnrPer snrPer;
   snrPer = m_interference.CalculatePlcpPayloadSnrPer (event);
+  HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_payload", "snr=" << snrPer.snr << " per=" << snrPer.per);
+  HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_payload", "snr=" << snrPer.snr << " per=" << snrPer.per);
   m_interference.NotifyRxEnd ();
 
     //NS_LOG_UNCOND ("YansWifiPhy::EndReceive, mode=" << (event->GetPayloadMode ().GetDataRate ()) <<
@@ -1239,12 +1262,12 @@ YansWifiPhy::EndReceive (Ptr<Packet> packet, enum WifiPreamble preamble, uint8_t
   if (m_plcpSuccess == true)
     {
       NS_LOG_DEBUG ("mode=" << (event->GetPayloadMode ().GetDataRate ()) << ", snr=" << snrPer.snr << ", per=" << snrPer.per << ", size=" << packet->GetSize ());
-        
+
         //double snrtest1 = CalculateSnr (WifiPhy::GetOfdmRate300KbpsBW1MHz (), 0.1); //test
         //double snrtest2 = CalculateSnr (WifiPhy::GetOfdmRate300KbpsBW1MHz (), 5.07867e-11); //test
         //double snrtest3 = CalculateSnr (WifiPhy::GetOfdmRate300KbpsBW1MHz (), 0); //test
         //NS_LOG_UNCOND ("1153--YansWifiPhy::EndReceive, snrtest1=" << snrtest1 << ", snrtest2=" << snrtest2 << ", snrtest3=" << snrtest3);
-        
+
        // NS_LOG_UNCOND ("YansWifiPhy::EndReceive, mode=" << (event->GetPayloadMode ().GetDataRate ()) << ", snr=" << snrPer.snr << ", per=" << snrPer.per << ", size=" << packet->GetSize () << "," << packet);
 
       if (m_random->GetValue () > snrPer.per)
@@ -1263,21 +1286,27 @@ YansWifiPhy::EndReceive (Ptr<Packet> packet, enum WifiPreamble preamble, uint8_t
           double signalDbm = RatioToDb (event->GetRxPowerW ()) + 30;
           double noiseDbm = RatioToDb (event->GetRxPowerW () / snrPer.snr) - GetRxNoiseFigure () + 30;
           NotifyMonitorSniffRx (packet, (uint16_t)GetChannelFrequencyMhz (), GetChannelNumber (), dataRate500KbpsUnits, isShortPreamble, event->GetTxVector (), signalDbm, noiseDbm);
+          HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_ok", "snr=" << snrPer.snr << " per=" << snrPer.per);
+          HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_ok", "snr=" << snrPer.snr << " per=" << snrPer.per);
           m_state->SwitchFromRxEndOk (packet, snrPer.snr, event->GetTxVector (), event->GetPreambleType ());
-            
+
           //NS_LOG_UNCOND ("YansWifiPhy::EndReceive, SwitchFromRxEndOk, "  << packet);
         }
       else
         {
           /* failure. */
           //NS_LOG_UNCOND ("YansWifiPhy::EndReceive-reason1");
-          NotifyRxDrop (packet);
+          HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+          HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_drop", "state=" << m_state->GetState () << " source_line=" << __LINE__);
+      NotifyRxDrop (packet);
           m_state->SwitchFromRxEndError (packet, snrPer.snr);
         }
     }
   else
     {
       //notify rx end
+      HALOW_BEACON_DIAG (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "beacon_phy_plcp_error", "snr=" << snrPer.snr << " per=" << snrPer.per);
+      HALOW_UPLINK_PHY (Mac48Address::ConvertFrom (m_device->GetAddress ()), packet, "uplink_phy_plcp_error", "snr=" << snrPer.snr << " per=" << snrPer.per);
       NS_LOG_UNCOND ("YansWifiPhy::EndReceive-reason2");
       m_state->SwitchFromRxEndError (packet, snrPer.snr);
     }
@@ -1331,7 +1360,7 @@ YansWifiPhy::SetGreenfield (bool greenfield)
 {
   m_greenfield = greenfield;
 }
-    
+
 void
 YansWifiPhy::SetS1g1Mfield (bool s1g1mfield)
 {
@@ -1713,7 +1742,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             }
             break;
         case 9:
-            
+
             if (!GetGuardInterval() && GetChannelWidth() == 1)
             {
                 mode = WifiPhy::GetOfdmRate4MbpsBW1MHz ();
@@ -1891,22 +1920,22 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate58_5MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode =  WifiPhy::GetOfdmRate65MbpsBW20MHzShGi ();
-                
+
             }
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate121_5MbpsBW40MHz ();
-                
+
             }
             else
             {
                 mode= WifiPhy::GetOfdmRate135MbpsBW40MHzShGi ();
-                
+
             }
             break;
         case 5:
@@ -1953,7 +1982,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate52MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
@@ -1962,12 +1991,12 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate108MbpsBW40MHz ();
-                
+
             }
             else
             {
                 mode = WifiPhy::GetOfdmRate120MbpsBW40MHz ();
-                
+
             }
             break;
         case 4:
@@ -2022,12 +2051,12 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate81MbpsBW40MHz ();
-                
+
             }
             else
             {
                 mode = WifiPhy::GetOfdmRate90MbpsBW40MHz ();
-                
+
             }
             break;
         case 3:
@@ -2074,17 +2103,17 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode =  WifiPhy::GetOfdmRate26MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate28_9MbpsBW20MHz ();
-                
+
             }
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate54MbpsBW40MHz ();
-                
+
             }
             else
             {
@@ -2135,22 +2164,22 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate19_5MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate21_7MbpsBW20MHz ();
-                
+
             }
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode =  WifiPhy::GetOfdmRate40_5MbpsBW40MHz ();
-                
+
             }
             else
             {
                 mode = WifiPhy::GetOfdmRate45MbpsBW40MHz ();
-                
+
             }
             break;
         case 1:
@@ -2197,7 +2226,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate13MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
@@ -2206,7 +2235,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate27MbpsBW40MHz ();
-                
+
             }
             else
             {
@@ -2258,7 +2287,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 20)
             {
                 mode = WifiPhy::GetOfdmRate6_5MbpsBW20MHz ();
-                
+
             }
             else if(GetGuardInterval() && GetChannelWidth() == 20)
             {
@@ -2267,7 +2296,7 @@ YansWifiPhy::McsToWifiMode (uint8_t mcs)
             else if (!GetGuardInterval() && GetChannelWidth() == 40)
             {
                 mode = WifiPhy::GetOfdmRate13_5MbpsBW40MHz ();
-                
+
             }
             else
             {

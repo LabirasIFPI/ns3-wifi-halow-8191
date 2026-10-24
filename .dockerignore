@@ -1,0 +1,11 @@
+.git
+.github
+.waf-*
+.waf3-*
+build
+build-*
+results
+validation/halow-8191/pacotes
+validation/halow-8191/closure-2026-10-17/sources-current.tar.gz
+**/__pycache__
+**/*.pyc

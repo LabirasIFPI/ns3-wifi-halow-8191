@@ -1,16 +1,64 @@
+# Validação Wi-Fi HaLow com até 8.191 estações
+
+Este fork do módulo IEEE 802.11ah para ns-3 contém as correções, o cenário em
+estrela, os runners e a documentação usados para validar **8.191 STAs associadas
+a um único AP**, com RAW/TIM paginado e tráfego UDP Echo.
+
+## Comece aqui
+
+1. Siga [a reprodução com Docker](docs/REPRODUCAO.md).
+2. Execute `./scripts/smoke-test.sh` antes de uma simulação longa.
+3. Consulte [os resultados e limites](validation/halow-8191/README.md).
+4. Baixe os conjuntos publicados conforme [o catálogo de artefatos](docs/ARTEFATOS.md).
+
+O perfil funcional foi concluído em três seeds. A campanha de carga também
+testou 8.191 STAs a aproximadamente 50 pedidos/s no seed 1, com 8.191
+transações completas. Esses resultados caracterizam a configuração documentada;
+não representam certificação integral do padrão ou capacidade máxima universal.
+
+Builds, resultados brutos e ZIPs são deliberadamente excluídos do Git. Eles são
+recriáveis ou publicados como artefatos com SHA-256, evitando um clone de vários
+gigabytes.
+
+## Estrutura do fork
+
+| Caminho | Finalidade |
+|---|---|
+| `src/` | Implementação do ns-3, incluindo as correções de Wi-Fi HaLow |
+| `scratch/test/` | Cenário em estrela usado na validação de 8.191 STAs |
+| `scratch/` | Testes dirigidos e cenários auxiliares |
+| `validation/halow-8191/` | Runners, analisadores, relatórios e evidências pequenas |
+| `docker/` | Ambiente legado reproduzível |
+| `scripts/` | Build, controle rápido e verificação do repositório |
+| `docs/` | Reprodução, escopo e catálogo de artefatos |
+| `results/` | Resultados brutos locais, ignorados pelo Git |
+| `build/`, `build-*` | Builds locais, ignorados pelo Git |
+
+Execute os comandos a partir da raiz do clone. O runner principal é
+`validation/halow-8191/run_rotating.py`. Publique novos conjuntos de dados em
+uma release, com nome novo, parâmetros documentados e SHA-256 registrado.
+
+Mais detalhes:
+
+- [como reproduzir](docs/REPRODUCAO.md);
+- [artefatos publicados e hashes](docs/ARTEFATOS.md);
+- [como contribuir](CONTRIBUTING.md).
+
+## Projeto original
+
 If you use our work, you can use the following citation to refer to it:
 > Le Tian, Amina Sljivo, Serena Santi, Eli De Poorter, Jeroen Hoebeke, Jeroen Famaey. **Extension of the IEEE 802.11ah NS-3 Simulation Module.** Workshop on ns-3 (WNS3), 2018.
 
 You can find the paper on [ResearchGate](https://www.researchgate.net/publication/324910418_Extension_of_the_IEEE_80211ah_ns-3_Simulation_Module).
 
-### IEEE 802.11ah ns-3 
+### IEEE 802.11ah ns-3
 > alpha version
 
 This repository hosts an implementation of the IEEE802.11ah (Wi-Fi HaLow) protocol for the NS-3 network simulator. It comes pre-packaged with NS-3 version 3.23 but multiple modules are updated to the 3.25 version to incorporate congestion control fixes for TCP traffic.
 
 This module includes support for:
 * Restricted Access Window (RAW) with interface for dynamic configuration
-* Traffic Indication Map (TIM) segmentation 
+* Traffic Indication Map (TIM) segmentation
 * Energy consumption model
 * Adaptive Modulation and Coding Scheme (MCS)
 
@@ -36,7 +84,7 @@ sudo apt-get -y install vtun lxc
 sudo apt -y install git
 git clone https://github.com/imec-idlab/IEEE-802.11ah-ns-3.git
 ```
-* Change into IEEE-802.11ah-ns-3 directory.  
+* Change into IEEE-802.11ah-ns-3 directory.
 * Configure waf:
 `CXXFLAGS="-std=c++11" ./waf configure --disable-examples --disable-tests`
 * Build:
@@ -44,10 +92,10 @@ git clone https://github.com/imec-idlab/IEEE-802.11ah-ns-3.git
 * Run the simulation (if you use [ahVisualizer](https://github.com/imec-idlab/ahVisualizer) start it first):
 `./waf --run test`
     * Pass the arguments for desired setup e.g.:
-    
+
     `./waf --run "test --seed=1 --simulationTime=60 --payloadSize=256"`
-  
-  
+
+
 ### RAW related parameters: ###
 * NRawSta:             Number of stations supporting RAW. NRawSta equals the largest AID specified in RAWConfigFile.
 * RAWConfigFile:       RAW configuration is stored in this file.
@@ -64,45 +112,45 @@ The default RAWConfigFile "./OptimalRawGroup/RawConfig-32-2-2.txt" sets 2 RPSs (
 ```
 line 1: NRPS = number of RPS elements
 
-line x: NRAW_k = number of RAW Groups in the RPS k; x = (NRAW_0 + NRAW_1 + ... + NRAW_(k-1)) + 1 + k; NRAW_0 = 0 
+line x: NRAW_k = number of RAW Groups in the RPS k; x = (NRAW_0 + NRAW_1 + ... + NRAW_(k-1)) + 1 + k; NRAW_0 = 0
 
         for RPS number k=1, line x=0+1+1=2 contains information on number of RAW groups in the RPS
-        
+
         for RPS number k=2 and NRAW_1=2 (from line 2), line x=0+2+1+2=5 contains information on number of RAW groups in the RPS
-        
+
 line 3, line 4 and line 6: configuration of each individual RAW group, including
 
-          * RawControl           Whether RAW can be accessed by any stations within the RAW group or only the paged stations within the RAW group.  
+          * RawControl           Whether RAW can be accessed by any stations within the RAW group or only the paged stations within the RAW group.
           * CrossSlotBoundary    Whether STAs are allowed to transmit after the assigned RAW slot boundary.
-          * SlotFormat           Format of RAW slot count.                 
-          * NRawSlotCount        Used for calculation of RAW slot duration.   
-          * NRawSlotNum          Number of slots per RAW group.                     
+          * SlotFormat           Format of RAW slot count.
+          * NRawSlotCount        Used for calculation of RAW slot duration.
+          * NRawSlotNum          Number of slots per RAW group.
           * Page                 Page index of the subset of AIDs.
           * Aid_start            Station with the lowest AID allocated in the RAW.
           * Aid_end              Station with the highest AID allocated in the RAW.
 
 
-Notes:   
-          1. RawControl, currently set to 0, RAW can be accessed by any stations within the RAW group.            
-          2. CrossSlotBoundary, currenty set to 1, only cross slot boundary are supported.                    
-          3. RAW slot duration = 500 us + NRawSlotCount * 120 us, NRawSlotCount is y = 11(8) bits   length when SlotFormat is set to 1(0), and NRawSlotNum is (14 - y) bits length.                                     
-          4. The above  RAWConfigFile assumes BeaconInterval is 102400 us. Users can adjust the parameters based on their own needs.                       
+Notes:
+          1. RawControl, currently set to 0, RAW can be accessed by any stations within the RAW group.
+          2. CrossSlotBoundary, currenty set to 1, only cross slot boundary are supported.
+          3. RAW slot duration = 500 us + NRawSlotCount * 120 us, NRawSlotCount is y = 11(8) bits   length when SlotFormat is set to 1(0), and NRawSlotNum is (14 - y) bits length.
+          4. The above  RAWConfigFile assumes BeaconInterval is 102400 us. Users can adjust the parameters based on their own needs.
 
 
 ### Wi-Fi mode parameters ###
-* DataMode:           Data mode.  
-* datarate:           Data rate of data mode.  
-* bandWidth:          BandWidth of data mode.  
+* DataMode:           Data mode.
+* datarate:           Data rate of data mode.
+* bandWidth:          BandWidth of data mode.
 
-Note: Relation between the above 3 parameters and MCS is described in file "MCStoWifiMode".       
+Note: Relation between the above 3 parameters and MCS is described in file "MCStoWifiMode".
 
 ### Other parameters ###
-* SimulationTime:     Simulatiom time in seconds after all stations get associated with AP.  
-* payloadSize:        Size of payload.                   
-* BeaconInterval:     Beacon interval time in us.    
-* UdpInterval:        Traffic mode, station send one packet every UdpInterval seconds.  
-* Nsta:               Number of total stations.  
-* rho:                Maximal distance between AP and stations.   
+* SimulationTime:     Simulatiom time in seconds after all stations get associated with AP.
+* payloadSize:        Size of payload.
+* BeaconInterval:     Beacon interval time in us.
+* UdpInterval:        Traffic mode, station send one packet every UdpInterval seconds.
+* Nsta:               Number of total stations.
+* rho:                Maximal distance between AP and stations.
 * seed:               Seed of RandomVariableStream.
 * TrafficPath:        Include traffic of each stations, packet sending interval can be automatically calcualted based on payloadSize. The above TrafficPath "./OptimalRawGroup/traffic/data-32-0.82.txt" contains traffic of 32 stations, and the total traffic is 0.82 Mbps.
 * S1g1MfieldEnabled:     Packet using 1 Mhz bandwidth if set to "true".
@@ -117,15 +165,15 @@ Note: Relation between the above 3 parameters and MCS is described in file "MCSt
 * timOffset:        Offset in number of Beacon Intervals from the DTIM that carries the first page slice of the page, default value is 0
 
     Example run: ./waf --run "test --pagePeriod=4 --pageSliceLength=8 --pageSliceCount=4"
-    
+
     * pagePeriod=4: every 4th beacon is DTIM beacon that carries Page Slice element for pageIndex=0
     * pageSliceLength=8: each page slice cosists of 8 blocks, meaning that each page slice (PS) accomodates up to 512 stations (8 blocks * 8 subblocks * 8 stations)
       * (slice0: 1-512, slice1: 513-1024, slice2: 1025-1536, slice3: 1537-2048)
       * The last page slice can have different length.
    * pageSliceCount=4: 4 TIMs are scheduled in one page period.
-    
+
     Note: RAW configuration must be in line with TIM and page configuration. If a RAW group is reserved for a station in beacon interval that does not correspond to its TIM, station will be asleep during that RAW.
-    
+
     To configure a single page slice (whole page encoded in a single page slice), it is neccessary to set pageSliceCount to 0 and pageSliceLength to 1.
 
 ### Rate control Algorithm (RCA) ###

@@ -1,0 +1,30 @@
+{
+  "run": "rotating-2048-20261013T125705581701Z",
+  "reference": "rotating-2048-20261013T124626485311Z",
+  "summary": {
+    "stations": "2048",
+    "associated": "2048",
+    "traffic_started": "1",
+    "association_s": "34.0926",
+    "traffic_window_s": "30",
+    "cooldown_s": "20",
+    "end_s": "84.0926",
+    "sent": "2048",
+    "delivered": "2048",
+    "echoed": "2048"
+  },
+  "recovered_previous_missing": 107,
+  "tx_prefix_equal": true,
+  "beacon_prefix_equal": true,
+  "source_hashes_equal": true,
+  "binary_hash_equal": true,
+  "all_ap_edca_queues_empty": true,
+  "last_ap_data_start": {
+    "time_us": "73345628",
+    "sender": "AP",
+    "aid": "544",
+    "classification": "own_slot",
+    "sequence": "0",
+    "retry": "0"
+  }
+}

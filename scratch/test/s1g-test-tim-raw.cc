@@ -17,18 +17,47 @@
  */
 
 #include "s1g-test-tim-raw.h"
+#include <set>
+#include <memory>
+#include <stdexcept>
+#include <cmath>
+
+#include "RawObserver.h"
 
 NS_LOG_COMPONENT_DEFINE("s1g-wifi-network-tim-raw");
 
+bool trafficStarted = false;
+EventId associationDeadline;
 uint32_t AssocNum = 0;
 int64_t AssocTime = 0;
 uint32_t StaNum = 0;
 NetDeviceContainer staDeviceCont;
-const int MaxSta = 8000;
+// Per-STA statistics capacity; the AP is not included in these arrays.
+// Multi-page RAW/TIM operation must be validated separately.
+const int MaxSta = 8191;
 
 Configuration config;
 Statistics stats;
 SimulationEventManager eventManager;
+
+// This scenario has one Wi-Fi device (index 0) per node. Resolve its
+// trace directly, preserving the full context string expected by callbacks.
+// Config::Connect repeatedly scans the global NodeList for each station.
+void ConnectNodeTrace(const std::string &path, const CallbackBase &callback) {
+    const uint32_t index = std::stoul(path.substr(std::string("/NodeList/").size()));
+    Ptr<WifiNetDevice> device = DynamicCast<WifiNetDevice>(NodeList::GetNode(index)->GetDevice(0));
+    Ptr<Object> target;
+    if (path.find("/Mac/") != std::string::npos) target = device->GetMac();
+    else if (path.find("/RemoteStationManager/") != std::string::npos) target = device->GetRemoteStationManager();
+    else if (path.find("/State/State") != std::string::npos) {
+        PointerValue state;
+        device->GetPhy()->GetAttribute("State", state);
+        target = state.GetObject();
+    } else target = device->GetPhy();
+    const std::string trace = path.substr(path.find_last_of('/') + 1);
+    NS_ABORT_MSG_IF(!target || !target->TraceConnect(trace, path, callback),
+                    "Unable to connect trace " << path);
+}
 
 class assoc_record {
 public:
@@ -122,62 +151,89 @@ void PopulateArpCache() {
 uint16_t ngroup;
 uint16_t nslot;
 RPSVector configureRAW(RPSVector rpslist, string RAWConfigFile) {
-	uint16_t NRPS = 0;
-	uint16_t NRAWPERBEACON = 0;
-	uint16_t Value = 0;
-	uint32_t page = 0;
-	uint32_t aid_start = 0;
-	uint32_t aid_end = 0;
-	uint32_t rawinfo = 0;
-
-	ifstream myfile(RAWConfigFile);
-	//1. get info from config file
-
-	//2. define RPS
-	if (myfile.is_open()) {
-		myfile >> NRPS;
-		int totalNumSta = 0;
-		for (uint16_t kk = 0; kk < NRPS; kk++) // number of beacons covering all raw groups
-		{
-			RPS *m_rps = new RPS;
-			myfile >> NRAWPERBEACON;
-			ngroup = NRAWPERBEACON;
-			for (uint16_t i = 0; i < NRAWPERBEACON; i++) // raw groups in one beacon
-			{
-				//RPS *m_rps = new RPS;
-				RPS::RawAssignment *m_raw = new RPS::RawAssignment;
-
-				myfile >> Value;
-				m_raw->SetRawControl(Value);  //support paged STA or not
-				myfile >> Value;
-				m_raw->SetSlotCrossBoundary(Value);
-				myfile >> Value;
-				m_raw->SetSlotFormat(Value);
-				myfile >> Value;
-				m_raw->SetSlotDurationCount(Value);
-				myfile >> Value;
-				nslot = Value;
-				m_raw->SetSlotNum(Value);
-				myfile >> page;
-				myfile >> aid_start;
-				myfile >> aid_end;
-				rawinfo = (aid_end << 13) | (aid_start << 2) | page;
-				m_raw->SetRawGroup(rawinfo);
-				totalNumSta += aid_end - aid_start + 1;
-				m_rps->SetRawAssignment(*m_raw);
-				delete m_raw;
-			}
-			rpslist.rpsset.push_back(m_rps);
-			//config.nRawGroupsPerRpsList.push_back(NRAWPERBEACON);
-		}
-		myfile.close();
-		config.NRawSta = totalNumSta;
-				/*rpslist.rpsset[rpslist.rpsset.size() - 1]->GetRawAssigmentObj(
-						NRAWPERBEACON - 1).GetRawGroupAIDEnd();*/
-	} else
-		cout << "Unable to open RAW configuration file \n";
-
-	return rpslist;
+    // Validate before packing: setters would otherwise truncate invalid fields.
+    ifstream input(RAWConfigFile);
+    if (!input) {
+        throw std::runtime_error("Unable to open RAW file: " + RAWConfigFile);
+    }
+    auto read = [&input]() -> uint32_t {
+        int64_t value;
+        if (!(input >> value) || value < 0 || value > 65535) {
+            throw std::runtime_error("Missing, malformed or out-of-range RAW field");
+        }
+        return static_cast<uint32_t>(value);
+    };
+    const uint32_t nrps = read();
+    if (nrps == 0) {
+        throw std::runtime_error("RAW requires at least one RPS");
+    }
+    std::set<uint32_t> population;
+    std::vector<std::unique_ptr<RPS> > parsed;
+    for (uint32_t r = 0; r < nrps; ++r) {
+        const uint32_t groups = read();
+        if (groups == 0) {
+            throw std::runtime_error("RPS requires at least one RAW group");
+        }
+        std::unique_ptr<RPS> rps(new RPS);
+        std::set<uint32_t> inRps;
+        ngroup = groups;
+        for (uint32_t g = 0; g < groups; ++g) {
+            const uint32_t control = read(), csb = read(), format = read();
+            const uint32_t duration = read(), slots = read(), page = read();
+            const uint32_t first = read(), last = read();
+            if (control > 255 || csb > 1 || format > 1 || page > 3 ||
+                first > last || last > 2047 || (page == 0 && first == 0) ||
+                duration > (format ? 2047u : 255u) ||
+                slots == 0 || slots > (format ? 7u : 63u)) {
+                throw std::runtime_error("Invalid RAW fields at RPS " +
+                    std::to_string(r + 1) + ", group " + std::to_string(g + 1));
+            }
+            for (uint32_t local = first; local <= last; ++local) {
+                const uint32_t aid = (page << 11) | local;
+                if (!inRps.insert(aid).second) {
+                    throw std::runtime_error("Overlapping RAW groups in RPS " +
+                        std::to_string(r + 1) + " at AID " + std::to_string(aid));
+                }
+                population.insert(aid);
+            }
+            RPS::RawAssignment raw;
+            raw.SetRawControl(control);
+            raw.SetSlotCrossBoundary(csb);
+            raw.SetSlotFormat(format);
+            raw.SetSlotDurationCount(duration);
+            raw.SetSlotNum(slots);
+            raw.SetRawGroup((last << 13) | (first << 2) | page);
+            nslot = slots;
+            rps->SetRawAssignment(raw);
+        }
+        parsed.push_back(std::move(rps));
+    }
+    input >> std::ws;
+    if (!input.eof()) {
+        throw std::runtime_error("Unexpected trailing RAW fields");
+    }
+    const uint32_t stations = config.Nsta == 0 ? population.size() : config.Nsta;
+    if (stations == 0 || stations > MaxSta || population.size() != stations) {
+        throw std::runtime_error("RAW unique population " + std::to_string(population.size()) +
+            " does not match supported Nsta " + std::to_string(stations) + " (1..8191)");
+    }
+    // This scenario creates consecutive station MACs/AIDs starting at one.
+    for (uint32_t aid = 1; aid <= stations; ++aid) {
+        if (!population.count(aid)) {
+            throw std::runtime_error("RAW does not cover scenario AID " + std::to_string(aid));
+        }
+    }
+    if (config.NRawSta != -1 && config.NRawSta != static_cast<int>(population.size())) {
+        throw std::runtime_error("NRawSta disagrees with unique RAW population");
+    }
+    config.Nsta = stations;
+    config.NRawSta = population.size();
+    for (auto &rps : parsed) {
+        rpslist.rpsset.push_back(rps.release());
+    }
+    std::cout << "RAW population validated: " << stations << " unique AIDs, "
+              << nrps << " RPS; coverage 1.." << stations << std::endl;
+    return rpslist;
 }
 
 /*
@@ -312,30 +368,26 @@ void onSTAAssociated(int i) {
 	cout << "Node " << std::to_string(i) << " is associated and has aid "
 			<< nodes[i]->aId << endl;
 
-	for (int k = 0; k < config.rps.rpsset.size(); k++) {
-		for (int j = 0; j < config.rps.rpsset[k]->GetNumberOfRawGroups(); j++) {
-			if (config.rps.rpsset[k]->GetRawAssigmentObj(j).GetRawGroupAIDStart()
-					<= i + 1
-					&& i + 1
-							<= config.rps.rpsset[k]->GetRawAssigmentObj(j).GetRawGroupAIDEnd()) {
-				nodes[i]->rpsIndex = k + 1;
-				nodes[i]->rawGroupNumber = j + 1;
-				nodes[i]->rawSlotIndex =
-						nodes[i]->aId
-								% config.rps.rpsset[k]->GetRawAssigmentObj(j).GetSlotNum()
-								+ 1;
-				/*cout << "Node " << i << " with AID " << (int)nodes[i]->aId << " belongs to " << (int)nodes[i]->rawSlotIndex << " slot of RAW group "
-				 << (int)nodes[i]->rawGroupNumber << " within the " << (int)nodes[i]->rpsIndex << " RPS." << endl;
-				 */
-			}
-		}
-	}
+    for (uint32_t k = 0; k < config.rps.rpsset.size(); ++k) {
+        for (uint32_t j = 0; j < config.rps.rpsset[k]->GetNumberOfRawGroups(); ++j) {
+            const auto group = config.rps.rpsset[k]->GetRawAssigmentObj(j);
+            const uint16_t local = nodes[i]->aId & 0x07ff;
+            if (group.GetRawGroupPage() == (nodes[i]->aId >> 11) &&
+                group.GetRawGroupAIDStart() <= local && local <= group.GetRawGroupAIDEnd()) {
+                nodes[i]->rpsIndex = k + 1;
+                nodes[i]->rawGroupNumber = j + 1;
+                nodes[i]->rawSlotIndex = local % group.GetSlotNum() + 1;
+            }
+        }
+    }
 
 	eventManager.onNodeAssociated(*nodes[i]);
 
 	// RPS, Raw group and RAW slot assignment
 
-	if (GetAssocNum() == config.Nsta) {
+	if (!trafficStarted && GetAssocNum() == config.Nsta) {
+        trafficStarted = true;
+        Simulator::Cancel(associationDeadline);
 		cout << "All " << AssocNum << " stations associated at " << Simulator::Now ().GetMicroSeconds () <<", configuring clients & server" << endl;
 
 		// association complete, start sending packets
@@ -364,6 +416,28 @@ void onSTAAssociated(int i) {
 			configureTCPSensorServer();
 			configureTCPSensorClients();
 		}
+        // Apps are installed during this callback; this ns-3 initializes their
+        // start/stop delays relative to installation time.
+        for (uint32_t n = 0; n < wifiStaNode.GetN(); ++n) {
+            Ptr<Node> node = wifiStaNode.Get(n);
+            for (uint32_t a = 0; a < node->GetNApplications(); ++a) {
+                Ptr<Application> app = node->GetApplication(a);
+                Ptr<UdpEchoClient> echo = DynamicCast<UdpEchoClient>(app);
+                if (echo)
+                  {
+                    echo->SetAttribute("SendUntil", TimeValue(Simulator::Now() + Seconds(config.simulationTime)));
+                    app->SetStopTime(Seconds(config.simulationTime + config.CoolDownPeriod));
+                  }
+                else
+                  {
+                    app->SetStopTime(Seconds(config.simulationTime));
+                  }
+            }
+        }
+        Simulator::Stop(Seconds(config.simulationTime + config.CoolDownPeriod));
+        std::cout << "Traffic window: " << Simulator::Now().GetSeconds() << ".."
+                  << Simulator::Now().GetSeconds() + config.simulationTime
+                  << " s; cooldown=" << config.CoolDownPeriod << " s" << std::endl;
 		updateNodesQueueLength();
 	}
 }
@@ -398,85 +472,85 @@ void configureNodes(NodeContainer& wifiStaNode, NetDeviceContainer& staDevice) {
 
 		nodes.push_back(n);
 		// hook up Associated and Deassociated events
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/Assoc",
 				MakeCallback(&NodeEntry::SetAssociation, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/DeAssoc",
 				MakeCallback(&NodeEntry::UnsetAssociation, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/NrOfTransmissionsDuringRAWSlot",
 				MakeCallback(
 						&NodeEntry::OnNrOfTransmissionsDuringRAWSlotChanged,
 						n));	//not implem
 
-		//Config::Connect("/NodeList/" + std::to_string(i) + "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/S1gBeaconMissed", MakeCallback(&NodeEntry::OnS1gBeaconMissed, n));
+		//ConnectNodeTrace("/NodeList/" + std::to_string(i) + "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/S1gBeaconMissed", MakeCallback(&NodeEntry::OnS1gBeaconMissed, n));
 
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/PacketDropped",
 				MakeCallback(&NodeEntry::OnMacPacketDropped, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/Collision",
 				MakeCallback(&NodeEntry::OnCollision, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/TransmissionWillCrossRAWBoundary",
 				MakeCallback(&NodeEntry::OnTransmissionWillCrossRAWBoundary,
 						n)); //?
 
 		// hook up TX
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyTxBegin",
 				MakeCallback(&NodeEntry::OnPhyTxBegin, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyTxEnd",
 				MakeCallback(&NodeEntry::OnPhyTxEnd, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyTxDropWithReason",
 				MakeCallback(&NodeEntry::OnPhyTxDrop, n)); //?
 
 		// hook up RX
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyRxBegin",
 				MakeCallback(&NodeEntry::OnPhyRxBegin, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyRxEnd",
 				MakeCallback(&NodeEntry::OnPhyRxEnd, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyRxDropWithReason",
 				MakeCallback(&NodeEntry::OnPhyRxDrop, n));
 
 		// hook up MAC traces
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/RemoteStationManager/MacTxRtsFailed",
 				MakeCallback(&NodeEntry::OnMacTxRtsFailed, n)); //?
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/RemoteStationManager/MacTxDataFailed",
 				MakeCallback(&NodeEntry::OnMacTxDataFailed, n));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/RemoteStationManager/MacTxFinalRtsFailed",
 				MakeCallback(&NodeEntry::OnMacTxFinalRtsFailed, n)); //?
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/RemoteStationManager/MacTxFinalDataFailed",
 				MakeCallback(&NodeEntry::OnMacTxFinalDataFailed, n)); //?
 
 		// hook up PHY State change
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + std::to_string(i)
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/State/State",
 				MakeCallback(&NodeEntry::OnPhyStateChange, n));
@@ -1052,12 +1126,19 @@ void configureUDPClients() {
 
 void configureUDPEchoClients() {
 	UdpEchoClientHelper clientHelper(apNodeInterface.GetAddress(0), 9); //address of remote node
-	clientHelper.SetAttribute("MaxPackets", UintegerValue(4294967295u));
+	clientHelper.SetAttribute("MaxPackets", UintegerValue(config.TrafficPackets));
 	clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.trafficInterval)));
 	//clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.trafficIntervalDeviation)));
 	clientHelper.SetAttribute("PacketSize", UintegerValue(config.payloadSize));
 
 	Ptr<UniformRandomVariable> m_rv = CreateObject<UniformRandomVariable>();
+	const double configuredStartSpread = config.trafficStartSpread == 4294967295u
+		? double(config.trafficInterval) : double(config.trafficStartSpread);
+	const double startSpread = std::min(configuredStartSpread,
+		config.simulationTime * 1000.0);
+	std::cout << "UDP Echo initial start spread: " << startSpread << " ms"
+		<< (config.trafficStartSpread == 4294967295u ? " (legacy interval-derived)" : " (explicit)")
+		<< std::endl;
 
 	for (uint16_t i = 0; i < config.Nsta; i++) {
 		ApplicationContainer clientApp = clientHelper.Install(
@@ -1067,7 +1148,7 @@ void configureUDPEchoClients() {
 		clientApp.Get(0)->TraceConnectWithoutContext("Rx",
 				MakeCallback(&NodeEntry::OnUdpEchoPacketReceived, nodes[i]));
 
-		double random = m_rv->GetValue(0, config.trafficInterval);
+		double random = startSpread == 0 ? 0 : m_rv->GetValue(0, startSpread);
 		clientApp.Start(MilliSeconds(0 + random));
 		//clientApp.Stop(Seconds(simulationTime + 1));
 	}
@@ -1165,20 +1246,51 @@ int main(int argc, char *argv[]) {
 	bool OutputPosition = true;
 	config = Configuration(argc, argv);
 
-	config.rps = configureRAW(config.rps, config.RAWConfigFile);
-	config.Nsta = config.NRawSta;
+    try {
+        config.rps = configureRAW(config.rps, config.RAWConfigFile);
+    } catch (const std::exception &error) {
+        std::cerr << "RAW configuration error: " << error.what()
+                  << ". No simulation was run." << std::endl;
+        return 2;
+    }
+    if (config.ValidateRawOnly) {
+        return 0;
+    }
 
+    if (!std::isfinite(config.AssociationTimeout) || config.AssociationTimeout <= 0 ||
+        !std::isfinite(config.simulationTime) || config.simulationTime <= 0 ||
+        config.trafficInterval == 0 || config.TrafficPackets == 0 ||
+        !std::isfinite(config.visualizerSamplingInterval) || config.visualizerSamplingInterval <= 0) {
+        std::cerr << "Invalid association deadline or traffic parameters" << std::endl;
+        return 2;
+    }
+    if (config.RotateRawPages) {
+        const bool sliced = config.pageSliceCount == 2 && config.pageSliceLength == 16;
+        config.pagePeriod = config.rps.rpsset.size() * (sliced ? 2 : 1);
+        if (config.rps.rpsset.empty() || config.rps.rpsset.size() > 4 ||
+            (!sliced && (config.pageSliceCount != 0 || config.pageSliceLength != 1)) ||
+            config.blockOffset != 0 || config.timOffset != 0) {
+            std::cerr << "Rotation requires 1..4 RPS, whole pages or two 16-block slices, and zero offsets" << std::endl;
+            return 2;
+        }
+    }
 	configurePageSlice ();
 	configureTIM ();
 	//checkRawAndTimConfiguration ();
 
-	config.NSSFile = config.trafficType + "_" + std::to_string(config.Nsta)
+	config.NSSFile = "results/" + config.trafficType + "_" + std::to_string(config.Nsta)
 			+ "sta_" + std::to_string(config.NGroup) + "Group_"
 			+ std::to_string(config.NRawSlotNum) + "slots_"
 			+ std::to_string(config.payloadSize) + "payload_"
 			+ std::to_string(config.totaltraffic) + "Mbps_"
 			+ std::to_string(config.BeaconInterval) + "BI" + ".nss";
 
+    if (!config.ResultPrefix.empty()) {
+        config.NSSFile = config.ResultPrefix + ".nss";
+        std::ofstream probe((config.ResultPrefix + "-summary.csv").c_str());
+        if (!probe) { std::cerr << "Cannot open ResultPrefix" << std::endl; return 2; }
+        if (config.trafficType == "udpecho") NodeEntry::OpenApplicationEvents(config.ResultPrefix);
+    }
 	stats = Statistics(config.Nsta);
 	eventManager = SimulationEventManager(config.visualizerIP,
 			config.visualizerPort, config.NSSFile);
@@ -1253,7 +1365,8 @@ int main(int argc, char *argv[]) {
 	                 "NRawStations", UintegerValue (config.NRawSta),
 	                 "RPSsetup", RPSVectorValue (config.rps),
 	                 "PageSliceSet", pageSliceValue (config.pageS),
-	                 "TIMSet", TIMValue (config.tim)
+	                 "TIMSet", TIMValue (config.tim),
+                     "RotateRawPages", BooleanValue(config.RotateRawPages)
 	               );
 
 	phy.Set("TxGain", DoubleValue(3.0));
@@ -1264,6 +1377,9 @@ int main(int argc, char *argv[]) {
 	phy.Set("RxNoiseFigure", DoubleValue(6.8));
 
 	apDevice = wifi.Install(phy, mac, wifiApNode);
+    if (config.RotateRawPages && !config.ResultPrefix.empty()) {
+        raw_observer::Install(staDevice, apDevice, config.ResultPrefix);
+    }
 
 	Config::Set(
 			"/NodeList/*/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/BE_EdcaTxopN/Queue/MaxPacketNumber",
@@ -1271,6 +1387,14 @@ int main(int argc, char *argv[]) {
 	Config::Set(
 			"/NodeList/*/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/BE_EdcaTxopN/Queue/MaxDelay",
 			TimeValue(NanoSeconds(6000000000000)));
+    {
+        // The AP buffers downlink for every STA until its page/slot; a 10-packet
+        // limit (meant for STAs) would drop most replies at scale.
+        PointerValue edca;
+        DynamicCast<RegularWifiMac>(DynamicCast<WifiNetDevice>(apDevice.Get(0))->GetMac())
+            ->GetAttribute("BE_EdcaTxopN", edca);
+        edca.Get<EdcaTxopN>()->GetEdcaQueue()->SetMaxSize(std::max<uint32_t>(10, config.Nsta));
+    }
 /*
 	string DataModeCamera = "OfdmRate650KbpsBW2MHz";
 	StringValue aa = StringValue(DataModeCamera);
@@ -1374,19 +1498,20 @@ int main(int argc, char *argv[]) {
 
 		assoc_record *m_assocrecord = new assoc_record;
 		m_assocrecord->setstaid(kk);
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + strSTA
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/Assoc",
 				MakeCallback(&assoc_record::SetAssoc, m_assocrecord));
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + strSTA
 						+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/DeAssoc",
 				MakeCallback(&assoc_record::UnsetAssoc, m_assocrecord));
 		assoc_vector.push_back(m_assocrecord);
 	}
 
-	std::cout << "Populating routing tables..." << std::endl;
-	Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+    // All peers are in the same /16 on one Wi-Fi link. Connected routes
+    // installed by address.Assign suffice; global SPF is unnecessary here.
+    std::cout << "Using connected routes for the single Wi-Fi subnet" << std::endl;
 	std::cout << "Populating ARP cache..." << std::endl;
 	PopulateArpCache();
 
@@ -1394,11 +1519,11 @@ int main(int argc, char *argv[]) {
 	std::cout << "Configuring trace sinks for nodes..." << std::endl;
 	configureNodes(wifiStaNode, staDevice);
 
-	Config::Connect(
+	ConnectNodeTrace(
 			"/NodeList/" + std::to_string(config.Nsta)
 					+ "/DeviceList/0/$ns3::WifiNetDevice/Phy/PhyRxDropWithReason",
 			MakeCallback(&OnAPPhyRxDrop));
-	Config::Connect(
+	ConnectNodeTrace(
 			"/NodeList/" + std::to_string(config.Nsta)
 					+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::ApWifiMac/PacketToTransmitReceivedFromUpperLayer",
 			MakeCallback(&OnAPPacketToTransmitReceived));
@@ -1429,7 +1554,7 @@ int main(int argc, char *argv[]) {
 		STA << i;
 		std::string strSTA = STA.str();
 
-		Config::Connect(
+		ConnectNodeTrace(
 				"/NodeList/" + strSTA
 						+ "/DeviceList/*/Phy/$ns3::YansWifiPhy/State/State",
 				MakeCallback(&PhyStateTrace));
@@ -1452,8 +1577,26 @@ int main(int argc, char *argv[]) {
 
 	sendStatistics(true);
 
-	Simulator::Stop(Seconds(config.simulationTime + config.CoolDownPeriod)); // allow up to a minute after the client & server apps are finished to process the queue
+	associationDeadline = Simulator::Schedule(Seconds(config.AssociationTimeout), [] {
+        std::cerr << "Association timeout: " << GetAssocNum() << "/" << config.Nsta << std::endl;
+        Simulator::Stop();
+    });
 	Simulator::Run();
+    NodeEntry::CloseApplicationEvents();
+
+    // Snapshot without queue Cleanup: do not change packet fate at shutdown.
+    if (!config.ResultPrefix.empty()) {
+        std::ofstream pending((config.ResultPrefix + "-ap-pending.log").c_str());
+        NS_ABORT_MSG_IF(!pending, "Cannot open AP pending diagnostics");
+        pending << "t_ns=" << Simulator::Now().GetNanoSeconds() << "\n";
+        auto apMac = DynamicCast<RegularWifiMac>(DynamicCast<WifiNetDevice>(apDevice.Get(0))->GetMac());
+        for (const char *name : {"BE_EdcaTxopN", "BK_EdcaTxopN", "VI_EdcaTxopN", "VO_EdcaTxopN"}) {
+            PointerValue value;
+            apMac->GetAttribute(name, value);
+            pending << "AP_AC name=" << name << "\n";
+            value.Get<EdcaTxopN>()->WritePendingDiagnostics(pending);
+        }
+    }
 
 	// Visualizer throughput
 	int pay = 0, totalSuccessfulPackets = 0, totalSentPackets = 0, totalPacketsEchoed = 0;
@@ -1470,7 +1613,7 @@ int main(int argc, char *argv[]) {
 				<< stats.get(i).GetPacketLoss(config.trafficType) << endl;
 	}
 
-	if (config.trafficType == "udp")
+	if (config.trafficType == "udp" && trafficStarted)
 	{
 		double throughput = 0;
 		uint32_t totalPacketsThrough =
@@ -1507,21 +1650,23 @@ int main(int argc, char *argv[]) {
 		std::cout << "datarate" << "\t" << "throughput" << std::endl;
 		std::cout << config.datarate << "\t" << throughput * 1000 << " Kbit/s" << std::endl;
 	}
-	cout << "total packet loss % "
-			<< 100 - 100. * totalPacketsEchoed / totalSentPackets << endl;
-	Simulator::Destroy();
+    if (totalSentPackets > 0) {
+        cout << "total packet loss % " << 100 - 100. * totalPacketsEchoed / totalSentPackets << endl;
+    } else {
+        cout << "total packet loss % unavailable (no packets sent)" << endl;
+    }
 
 	ofstream risultati;
-	string addressresults = config.OutputPath + "moreinfo.txt";
+	string addressresults = config.ResultPrefix.empty() ? config.OutputPath + "moreinfo.txt" : config.ResultPrefix + "-phy.csv";
 	risultati.open(addressresults.c_str(), ios::out | ios::trunc);
 
-    risultati << "Sta node#,distance,timerx(notassociated),timeidle(notassociated),timetx(notassociated),timesleep(notassociated),timecollision(notassociated)" << std::endl;
+    risultati << "sta_index,distance_m,phy_rx_associated_s,phy_rx_not_associated_s,phy_idle_associated_s,phy_idle_not_associated_s,phy_tx_associated_s,phy_tx_not_associated_s,phy_sleep_associated_s,phy_sleep_not_associated_s,phy_cca_busy_associated_s,phy_cca_busy_not_associated_s" << std::endl;
     int i = 0;
     string spazio = ",";
-    
+
     while (i < config.Nsta) {
-        
-        risultati << i << spazio << dist[i] << spazio << timeRxArray[i].GetSeconds() << ",(" << timeRxNotAssociated[i].GetSeconds() << ")," << timeIdleArray[i].GetSeconds() << ",(" << timeIdleNotAssociated[i].GetSeconds() << ")," << timeTxArray[i].GetSeconds() << ",(" << timeTxNotAssociated[i].GetSeconds() << ")," << timeSleepArray[i].GetSeconds() << ",(" << timeSleepNotAssociated[i].GetSeconds() << ")," << timeCollisionArray[i].GetSeconds() << ",(" << timeCollisionNotAssociated[i].GetSeconds() << ")" << std::endl;
+
+        risultati << i << spazio << dist[i] << spazio << timeRxArray[i].GetSeconds() << ',' << timeRxNotAssociated[i].GetSeconds() << ',' << timeIdleArray[i].GetSeconds() << ',' << timeIdleNotAssociated[i].GetSeconds() << ',' << timeTxArray[i].GetSeconds() << ',' << timeTxNotAssociated[i].GetSeconds() << ',' << timeSleepArray[i].GetSeconds() << ',' << timeSleepNotAssociated[i].GetSeconds() << ',' << timeCollisionArray[i].GetSeconds() << ',' << timeCollisionNotAssociated[i].GetSeconds() << std::endl;
         /*
          cout << "================== Sleep " << stats.get(i).TotalSleepTime.GetSeconds() << endl;
          cout << "================== Tx " << stats.get(i).TotalTxTime.GetSeconds() << endl;
@@ -1530,10 +1675,52 @@ int main(int argc, char *argv[]) {
          cout << "ooooooooooooooooooo TOTENERGY " <<  stats.get(i).GetTotalEnergyConsumption() << " mW" << endl;
          cout << "Rx+Idle ENERGY " <<  stats.get(i).EnergyRxIdle << " mW" << endl;
          cout << "Tx ENERGY " <<  stats.get(i).EnergyTx << " mW" << endl;*/
-        
+
         i++;
     }
 
 	risultati.close();
-	return 0;
+    const uint32_t associated = GetAssocNum();
+    auto apManager = DynamicCast<WifiNetDevice>(apDevice.Get(0))->GetRemoteStationManager();
+    uint32_t apAssociated = 0;
+    std::ofstream associationAudit;
+    if (!config.ResultPrefix.empty()) {
+        associationAudit.open((config.ResultPrefix + "-association.csv").c_str());
+        NS_ABORT_MSG_IF(!associationAudit, "Cannot open association audit");
+        associationAudit << "aid,sta_associated,ap_associated,ap_waiting\n";
+    }
+    for (uint32_t n = 0; n < config.Nsta; ++n) {
+        Mac48Address address = Mac48Address::ConvertFrom(staDevice.Get(n)->GetAddress());
+        const bool confirmed = apManager->IsAssociated(address);
+        apAssociated += confirmed;
+        if (associationAudit.is_open())
+            associationAudit << n + 1 << ',' << assoc_vector[n]->GetAssoc() << ','
+                             << confirmed << ',' << apManager->IsWaitAssocTxOk(address) << '\n';
+    }
+    std::cout << "RUN_STATUS associated=" << associated << "/" << config.Nsta
+              << " ap_associated=" << apAssociated << "/" << config.Nsta
+              << " traffic_started=" << trafficStarted
+              << " end_s=" << Simulator::Now().GetSeconds() << std::endl;
+    if (!config.ResultPrefix.empty()) {
+        std::ofstream summary((config.ResultPrefix + "-summary.csv").c_str());
+        summary << "aid,associated,sent,delivered,echoed\n";
+        for (uint32_t n = 0; n < config.Nsta; ++n) {
+            summary << n + 1 << ',' << assoc_vector[n]->GetAssoc() << ','
+                    << stats.get(n).NumberOfSentPackets << ','
+                    << stats.get(n).NumberOfSuccessfulPackets << ','
+                    << stats.get(n).NumberOfSuccessfulRoundtripPackets << '\n';
+        }
+        std::ofstream run((config.ResultPrefix + "-run.csv").c_str());
+        run << "stations,associated,traffic_started,association_s,traffic_window_s,cooldown_s,end_s,sent,delivered,echoed\n";
+        run << config.Nsta << ',' << associated << ',' << trafficStarted << ',';
+        if (trafficStarted) run << stats.TimeWhenEverySTAIsAssociated.GetSeconds();
+        run << ',' << config.simulationTime << ',' << config.CoolDownPeriod << ','
+            << Simulator::Now().GetSeconds() << ',' << totalSentPackets << ','
+            << totalSuccessfulPackets << ',' << totalPacketsEchoed << '\n';
+    }
+    std::cout << "RAW_OBSERVER beacons=" << raw_observer::beacons
+              << " data=" << raw_observer::data << " wrong_slot=" << raw_observer::wrong
+              << " page_mismatch=" << raw_observer::mismatch << std::endl;
+    Simulator::Destroy();
+	return trafficStarted && associated == config.Nsta && apAssociated == config.Nsta && !raw_observer::wrong && !raw_observer::mismatch ? 0 : 2;
 }

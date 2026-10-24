@@ -25,6 +25,8 @@
 
 #include <list>
 #include <utility>
+#include <functional>
+#include <ostream>
 #include "ns3/packet.h"
 #include "ns3/nstime.h"
 #include "ns3/object.h"
@@ -56,6 +58,8 @@ public:
   static TypeId GetTypeId (void);
   WifiMacQueue ();
   ~WifiMacQueue ();
+  // Read-only snapshot: unlike Peek/GetSize, does not run Cleanup.
+  void WritePendingDiagnostics (std::ostream &out) const;
 
   typedef void (* PacketDroppedCallback)
                   (Ptr<const Packet> packet, DropReason reason);
@@ -192,7 +196,8 @@ public:
    */
   Ptr<const Packet> DequeueFirstAvailable (WifiMacHeader *hdr,
                                            Time &tStamp,
-                                           const QosBlockedDestinations *blockedPackets);
+                                           const QosBlockedDestinations *blockedPackets,
+                                           std::function<bool (const WifiMacHeader &)> canTransmit = {});
   /**
    * Returns first available packet for transmission. The packet isn't removed from queue.
    *
@@ -204,8 +209,9 @@ public:
    */
   Ptr<const Packet> PeekFirstAvailable (WifiMacHeader *hdr,
                                         Time &tStamp,
-                                        const QosBlockedDestinations *blockedPackets);
-  
+                                        const QosBlockedDestinations *blockedPackets,
+                                        std::function<bool (const WifiMacHeader &)> canTransmit = {});
+
   Ptr<const Packet> PeekAvailable (WifiMacHeader *hdr, Time &timestamp,
                                   const QosBlockedDestinations *blockedPackets, uint16_t k);
   /**

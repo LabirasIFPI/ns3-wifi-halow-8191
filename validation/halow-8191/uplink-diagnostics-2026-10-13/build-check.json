@@ -1,0 +1,14 @@
+{
+  "build_exit_code": 0,
+  "simulations_run": false,
+  "sha256": {
+    "src/wifi/model/association-diagnostics.h": "5affe60af4b4c01a81322512dfd124f23ff579c5d7e3cb48aaae2fe90b863f93",
+    "src/wifi/model/yans-wifi-phy.cc": "e3ebb8d4797cf72840632e7d9bf4d4e481a6e95ec9f2e7eb242490437fb6f241",
+    "src/wifi/model/mac-low.cc": "9cea8628de56941b6b1c59b06d11cb75bd58c94f830d0968e171f11b2ecb14cb",
+    "src/wifi/model/mac-rx-middle.cc": "777265a59ff582d48890dc54c412daa0cdf2c7ecdf85ad0e34e0ff5fb6748229",
+    "src/wifi/model/ap-wifi-mac.cc": "eec7bb92893f28489972d58c5cfb6af48e8683c948c09e6c5c088049ac7ebf28",
+    "scratch/test/NodeEntry.cc": "df60d8fb1bcb45db162e6589ebf38dc4d187997dc98d9289b4199667cd780e00",
+    "validation/halow-8191/run_rotating.py": "ca65506e27b0511a213386a00609d65c452432297b17759a38f433abf60dfb99",
+    "build-o2/scratch/test/test": "20feccbf6411964c376960d2d5eddb5f987eeab0772b0ccc45e4a039b9f07268"
+  }
+}

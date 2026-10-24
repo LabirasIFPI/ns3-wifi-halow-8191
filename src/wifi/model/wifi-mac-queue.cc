@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005, 2009 INRIA
@@ -73,6 +74,19 @@ WifiMacQueue::~WifiMacQueue ()
 }
 
 void
+WifiMacQueue::WritePendingDiagnostics (std::ostream &out) const
+{
+  out << "QUEUE_FINAL size=" << m_size << " max_size=" << m_maxSize
+      << " max_delay_ns=" << m_maxDelay.GetNanoSeconds () << "\n";
+  for (const auto &item : m_queue)
+    out << "QUEUE_PENDING to=" << item.hdr.GetAddr1 ()
+        << " from=" << item.hdr.GetAddr2 () << " uid=" << item.packet->GetUid ()
+        << " seq=" << item.hdr.GetSequenceNumber () << " retry=" << item.hdr.IsRetry ()
+        << " queued_ns=" << item.tstamp.GetNanoSeconds ()
+        << " age_ns=" << (Simulator::Now () - item.tstamp).GetNanoSeconds () << "\n";
+}
+
+void
 WifiMacQueue::SetMaxSize (uint32_t maxSize)
 {
   m_maxSize = maxSize;
@@ -102,6 +116,8 @@ WifiMacQueue::Enqueue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
   Cleanup ();
   if (m_size == m_maxSize)
     {
+
+      HALOW_DIAG (hdr.GetAddr1 (), "queue_drop_full", "uid=" << packet->GetUid () << " from=" << hdr.GetAddr2 ());
 	  //std::cout << "DROPPING PACKET FROM WIFI MAC QUEUE " << std::endl;
 	  m_packetdropped(packet->Copy(), DropReason::MacQueueSizeExceeded);
       return;
@@ -109,6 +125,7 @@ WifiMacQueue::Enqueue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
   Time now = Simulator::Now ();
   m_queue.push_back (Item (packet, hdr, now));
   m_size++;
+  HALOW_DIAG (hdr.GetAddr1 (), "queue_enqueue", "uid=" << packet->GetUid () << " from=" << hdr.GetAddr2 () << " size=" << m_size);
 }
 
 void
@@ -129,6 +146,7 @@ WifiMacQueue::Cleanup (void)
         }
       else
         {
+          HALOW_DIAG (i->hdr.GetAddr1 (), "queue_drop_expired", "uid=" << i->packet->GetUid () << " from=" << i->hdr.GetAddr2 ());
     	  m_packetdropped(i->packet->Copy(), DropReason::MacQueueDelayExceeded);
           i = m_queue.erase (i);
           n++;
@@ -329,18 +347,21 @@ WifiMacQueue::GetNPacketsByTidAndAddress (uint8_t tid, WifiMacHeader::AddressTyp
 
 Ptr<const Packet>
 WifiMacQueue::DequeueFirstAvailable (WifiMacHeader *hdr, Time &timestamp,
-                                     const QosBlockedDestinations *blockedPackets)
+                                     const QosBlockedDestinations *blockedPackets,
+                                     std::function<bool (const WifiMacHeader &)> canTransmit)
 {
   Cleanup ();
   Ptr<const Packet> packet = 0;
   for (PacketQueueI it = m_queue.begin (); it != m_queue.end (); it++)
     {
+      if (canTransmit && !canTransmit (it->hdr)) continue;
       if (!it->hdr.IsQosData ()
           || !blockedPackets->IsBlocked (it->hdr.GetAddr1 (), it->hdr.GetQosTid ()))
         {
           *hdr = it->hdr;
           timestamp = it->tstamp;
           packet = it->packet;
+          HALOW_DIAG (hdr->GetAddr1 (), "queue_dequeue_available", "uid=" << packet->GetUid () << " from=" << hdr->GetAddr2 ());
           m_queue.erase (it);
           m_size--;
           return packet;
@@ -351,11 +372,13 @@ WifiMacQueue::DequeueFirstAvailable (WifiMacHeader *hdr, Time &timestamp,
 
 Ptr<const Packet>
 WifiMacQueue::PeekFirstAvailable (WifiMacHeader *hdr, Time &timestamp,
-                                  const QosBlockedDestinations *blockedPackets)
+                                  const QosBlockedDestinations *blockedPackets,
+                                  std::function<bool (const WifiMacHeader &)> canTransmit)
 {
   Cleanup ();
   for (PacketQueueI it = m_queue.begin (); it != m_queue.end (); it++)
     {
+      if (canTransmit && !canTransmit (it->hdr)) continue;
       if (!it->hdr.IsQosData ()
           || !blockedPackets->IsBlocked (it->hdr.GetAddr1 (), it->hdr.GetQosTid ()))
         {

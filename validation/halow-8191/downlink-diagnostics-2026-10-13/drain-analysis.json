@@ -1,0 +1,23 @@
+{
+  "run": "rotating-2048-20261013T124626485311Z",
+  "send_end_us": 64092603,
+  "cooldown_ap": {
+    "data_starts": 244,
+    "retry_starts": 23,
+    "first_destination_starts": 221
+  },
+  "cooldown_by_slot": {
+    "0": {
+      "starts": 120,
+      "first_destinations": 114
+    },
+    "1": {
+      "starts": 119,
+      "first_destinations": 102
+    },
+    "2": {
+      "starts": 5,
+      "first_destinations": 5
+    }
+  }
+}

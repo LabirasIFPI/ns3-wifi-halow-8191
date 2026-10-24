@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005 INRIA
@@ -288,6 +289,7 @@ DcaTxop::GetAifsn (void) const
 void
 DcaTxop::Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
 {
+  HALOW_DIAG (hdr.GetAddr2 (), "dca_enqueue", "to=" << hdr.GetAddr1 () << " assoc_req=" << hdr.IsAssocReq () << " allowed=" << AccessIfRaw << " pending=" << (m_currentPacket != 0));
   NS_LOG_FUNCTION (this << packet << &hdr);
   NS_LOG_DEBUG("DcaTxop::Queue " << Simulator::Now () << "\t" << m_low->GetAddress () << "\t" << packet->GetSize ());
   WifiMacTrailer fcs;
@@ -309,9 +311,12 @@ DcaTxop::AssignStreams (int64_t stream)
 void
 DcaTxop::AccessAllowedIfRaw (bool allowed)
 {
+  if (m_low != 0 && AccessIfRaw != allowed)
+    HALOW_DIAG (m_low->GetAddress (), "dca_permission", "allowed=" << allowed
+      << " pending=" << (m_currentPacket != 0) << " requested=" << m_dcf->IsAccessRequested ());
   AccessIfRaw = allowed;
 }
-    
+
 void
 DcaTxop::RestartAccessIfNeeded (void)
 {
@@ -338,7 +343,7 @@ DcaTxop::StartAccessIfNeeded (void)
       m_manager->RequestAccess (m_dcf);
     }
 }
-    
+
 void
 DcaTxop::StartAccessIfNeededRaw (void) //possibilely necessary, start new backoff immdeiately,  even when m_currentPacket == 1. if no, start new backoff when current transimission is successful(StartAccessIfNeeded) or failed(RestartAccessIfNeeded).
 {
@@ -350,7 +355,7 @@ DcaTxop::StartAccessIfNeededRaw (void) //possibilely necessary, start new backof
        m_manager->RequestAccess (m_dcf);
     }
 }
-    
+
 void
 DcaTxop::RawStart (Time duration, bool crossSlotBoundaryAllowed)
 {
@@ -498,12 +503,13 @@ DcaTxop::NeedsAccess (void) const
 void
 DcaTxop::NotifyAccessGranted (void)
 {
+  HALOW_DIAG (m_low->GetAddress (), "dca_granted", "allowed=" << AccessIfRaw << " pending=" << (m_currentPacket != 0));
   NS_LOG_FUNCTION (this);
   Time remainingRawTime =  rawDuration -  (Simulator::Now() - rawStartedAt);
   if(DEBUG_TRACK_PACKETS) std::cout << "Access  granted (raw access: " << AccessIfRaw << ")" << std::endl;
 
   NS_LOG_DEBUG("DcaTxop::NotifyAccessGranted " << Simulator::Now () << "\t" << m_low->GetAddress ());
-  if (!AccessIfRaw) 
+  if (!AccessIfRaw)
     {
         return;
     }
@@ -609,6 +615,7 @@ DcaTxop::NotifyAccessGranted (void)
         	  m_transmissionWillCrossRAWBoundary(txDuration, remainingRawTime);
         	  return;
           }*/
+          HALOW_DIAG (m_currentHdr.GetAddr2 (), "dca_start_tx", "to=" << m_currentHdr.GetAddr1 () << " assoc_req=" << m_currentHdr.IsAssocReq () << " seq=" << m_currentHdr.GetSequenceNumber ());
           Low ()->StartTransmission (m_currentPacket, &m_currentHdr,
                                      params, m_transmissionListener);
           //nrOfTransmissionsDuringRaw++;
@@ -697,6 +704,7 @@ DcaTxop::MissedCts (void)
 void
 DcaTxop::GotAck (double snr, WifiMode txMode)
 {
+  HALOW_DIAG (m_low->GetAddress (), "dca_ack", "allowed=" << AccessIfRaw << " pending=" << (m_currentPacket != 0));
   NS_LOG_FUNCTION (this << snr << txMode);
   if (!NeedFragmentation ()
       || IsLastFragment ())
@@ -724,6 +732,7 @@ DcaTxop::GotAck (double snr, WifiMode txMode)
 void
 DcaTxop::MissedAck (void)
 {
+  HALOW_DIAG (m_low->GetAddress (), "dca_missed_ack", "allowed=" << AccessIfRaw << " pending=" << (m_currentPacket != 0));
   NS_LOG_FUNCTION (this);
   NS_LOG_DEBUG ("missed ack");
   if (!NeedDataRetransmission ())

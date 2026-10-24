@@ -1,3 +1,5 @@
+#include "association-diagnostics.h"
+#include "ns3/abort.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2006, 2009 INRIA
@@ -159,7 +161,7 @@ StaWifiMac::StaWifiMac ()
   fastAssocThreshold = 0; // allow some station to associate at the begining
     Ptr<UniformRandomVariable> m_rv = CreateObject<UniformRandomVariable> ();
   assocVaule = m_rv->GetValue (0, 999);
-  
+
   firstBeacon = true;
   receivingBeacon = false;
   timeDifferenceBeacon = 0;
@@ -175,7 +177,7 @@ StaWifiMac::StaWifiMac ()
         m_edca.find (AC_VI)->second->SetsleepCallback (MakeCallback (&StaWifiMac::SleepIfQueueIsEmpty,this));
         m_edca.find (AC_BE)->second->SetsleepCallback (MakeCallback (&StaWifiMac::SleepIfQueueIsEmpty,this));
         m_edca.find (AC_BK)->second->SetsleepCallback (MakeCallback (&StaWifiMac::SleepIfQueueIsEmpty,this));
-  
+
 
   //else
   //    m_dca->SetTxOkCallback(MakeCallback(StaWifiMac::SleepIfQueueIsEmpty), this);
@@ -220,7 +222,7 @@ StaWifiMac::SetChannelWidth (uint32_t width)
 uint32_t
 StaWifiMac::GetChannelWidth (void) const
 {
-    NS_LOG_UNCOND (GetAddress () << ", GetChannelWidth " << m_channelWidth );
+    // NS_LOG_UNCOND (GetAddress () << ", GetChannelWidth " << m_channelWidth );
    return m_channelWidth;
 }
 
@@ -374,6 +376,62 @@ StaWifiMac::SendPspollIfnecessary (void)
 	{
 		m_TIM = beacon.GetTIM();
 
+        // Bounded rotating profile: two 16-block slices, one per beacon.
+        // The Page Slice element is on the DTIM only; retain it for slice 1.
+        if (m_TIM.GetDTIMPeriod () == 2)
+          {
+            if (m_TIM.GetDTIMCount () == 0)
+              {
+                m_pageSlice = beacon.GetpageSlice ();
+                m_haveTimPageSlice = true;
+              }
+            if (!m_haveTimPageSlice)
+              {
+                // Newly associated after this page's DTIM: wait for metadata.
+                ClearDataBuffered ();
+                return;
+              }
+            if (m_pageSlice.GetPageSliceCount () == 2 && m_pageSlice.GetPageSliceLen () == 16 &&
+                m_pageSlice.GetBlockOffset () == 0 && m_pageSlice.GetTIMOffset () == 0)
+              {
+                bool buffered = false;
+                const uint8_t ownBlock = (GetAID () >> 6) & 31;
+                if ((GetAID () >> 11) == m_TIM.GetPageIndex () &&
+                    m_pageSlice.GetPageindex () == m_TIM.GetPageIndex ())
+                  {
+                    const uint8_t* bits = m_TIM.GetPartialVBitmap ();
+                    uint16_t pos = 0;
+                    while (pos < m_TIM.m_length)
+                      {
+                        NS_ABORT_MSG_IF (pos + 2 > m_TIM.m_length, "Truncated sliced TIM block");
+                        const uint8_t control = bits[pos++], present = bits[pos++];
+                        NS_ABORT_MSG_IF ((control & 7) != 0, "Unsupported sliced TIM coding");
+                        const uint8_t block = control >> 3;
+                        NS_ABORT_MSG_IF (block / 16 != m_TIM.GetPageSliceNum (), "Block outside advertised TIM slice");
+                        for (uint8_t sub = 0; sub < 8; ++sub)
+                          if (present & (1u << sub))
+                            {
+                              NS_ABORT_MSG_IF (pos >= m_TIM.m_length, "Truncated sliced TIM subblock");
+                              if (block == ownBlock && sub == ((GetAID () >> 3) & 7))
+                                buffered = (bits[pos] & (1u << (GetAID () & 7))) != 0;
+                              ++pos;
+                            }
+                      }
+                  }
+                if (buffered) SetDataBuffered (); else ClearDataBuffered ();
+                // Listen at every beacon in this profile. Avoid inheriting the
+                // legacy long sleep formula, which assumes unsliced rotation.
+                if (!buffered)
+                  {
+                    const uint32_t interval = beacon.GetBeaconCompatibility ().GetBeaconInterval ();
+                    const uint32_t age = uint32_t (Simulator::Now ().GetMicroSeconds ()) - beacon.GetTimeStamp ();
+                    const uint32_t remaining = interval - (age % interval);
+                    GoToSleep (MicroSeconds (remaining > 160 ? remaining - 160 : 0));
+                  }
+                return;
+              }
+          }
+
 		if (!m_pagedInDtim && !(m_TIM.GetDTIMCount() == 0)) //(!(m_pagedInDtim ^ m_TIM.GetDTIMCount() == 0))
 			return;
 
@@ -391,6 +449,8 @@ StaWifiMac::SendPspollIfnecessary (void)
 		m_TIMOffset = m_pageSlice.GetTIMOffset();
 
 		m_DTIMCount = m_TIM.GetDTIMCount();
+		m_DTIMPeriod = m_TIM.GetDTIMPeriod();
+		m_BlockOffset = m_pageSlice.GetBlockOffset();
 		//m_PageSliceNum = m_TIM.GetPageSliceNum ();
 
 
@@ -467,7 +527,10 @@ StaWifiMac::SendPspollIfnecessary (void)
 				selfPageSliceNumber--;
 			}
 
-			if (selfPageSliceNumber != m_TIM.GetPageSliceNum())
+			// 31 encodes the whole page here, not a delay of 31 beacon intervals.
+			const bool wholePage = m_pageSlice.GetPageSliceCount() == 0 &&
+			                       m_pageSlice.GetPageSliceLen() == 1;
+			if (!wholePage && selfPageSliceNumber != m_TIM.GetPageSliceNum())
 			{
 
 				NS_LOG_DEBUG(
@@ -523,75 +586,56 @@ StaWifiMac::SendPspollIfnecessary (void)
 		m_DTIMPeriod = m_TIM.GetDTIMPeriod();
 		m_PageIndex = m_TIM.GetPageIndex();
 
-		uint8_t * partialVBitmap = m_TIM.GetPartialVBitmap();
-		//length =  m_TIM.GetInformationFieldSize ();
-		NS_ASSERT(m_TIM.GetInformationFieldSize() >= 5);
-		//NS_ASSERT (m_TIM.GetInformationFieldSize () >= 2);
-		uint8_t pos = 0;
-		do
-		{
-			uint8_t blockind = ((*partialVBitmap) >> 3) & 0x1f;
-			partialVBitmap++;
-			pos++;
-			uint8_t blockbitmap = *partialVBitmap;
-			if (this->GetAID() == 5 || GetAID() == 9)
-			this->GetSelfPageSliceNum();
-			if (blockind == m_selfBlock)
-			{
-				if ((blockbitmap & (1 << m_selfSubBlock)) == 0) //no packets in subblock
-				{
-					//if not included in the page slice element, wake up for DTIM
-					// reset m_pagedInDtim;
-					m_pagedInDtim = false;
-					GoToSleepCurrentTIM(beacon);
-					return;
-				}
-				else
-				{
-					for (uint8_t j = 0; j <= m_selfSubBlock; j++)
-					{
-						if ((blockbitmap & (0x01 << j)))//==1 is incorrect because sometimes it can be 0000 0010 e.g. 2
-						{
-							partialVBitmap++;
-							pos++;
-						}
-					}
-					uint8_t subblockind = *partialVBitmap;
-					if ((subblockind & (1 << (m_selfAid & 0x0007))) == 0) //no packet for me
-					{
-						m_pagedInDtim = false;
-						GoToSleepCurrentTIM(beacon);
-						return;
-					}
-					else // if has packet, set station to sleep after this beacon
-					{
-						NS_LOG_INFO(
-								"[aid=" << this->GetAID() << "]" << "Downlink packet indicated for me.");
-						// reset m_pagedInDtim;
-						m_pagedInDtim = false;
-						GoToSleepNextTIM(beacon);
-						return;
-					}
-				}
-			}
-			else
-			{
-				for (uint8_t k = 0; k <= 7; k++)
-				{
-					if ((blockbitmap & (1 << k)) == 1)
-					{
-						partialVBitmap++;
-						pos++;
-					}
-				}
-			}
-		}
-		while (pos < m_TIM.GetInformationFieldSize() - 3); //only partialVBitmap; exclude DTIM COUNT,DTIM period and bitmap control
+        const uint8_t *bitmap = m_TIM.GetPartialVBitmap();
+        const uint16_t length = m_TIM.m_length;
+        uint16_t pos = 0;
+        while (pos < length) {
+            NS_ABORT_MSG_IF(pos + 2 > length, "Truncated TIM block header");
+            const uint8_t control = bitmap[pos++];
+            NS_ABORT_MSG_IF((control & 7) != 0, "Unsupported TIM block coding");
+            const uint8_t block = control >> 3;
+            const uint8_t present = bitmap[pos++];
+            uint8_t count = 0;
+            for (uint8_t bit = 0; bit < 8; ++bit) {
+                if (present & (1u << bit)) ++count;
+            }
+            NS_ABORT_MSG_IF(pos + count > length, "Truncated TIM subblocks");
+            if (block == m_selfBlock) {
+                bool buffered = false;
+                for (uint8_t bit = 0; bit < 8; ++bit) {
+                    if (present & (1u << bit)) {
+                        if (bit == m_selfSubBlock) {
+                            buffered = (bitmap[pos] & (1u << (m_selfAid & 7))) != 0;
+                        }
+                        ++pos;
+                    }
+                }
+                m_pagedInDtim = false;
+                if (buffered) GoToSleepNextTIM(beacon);
+                else GoToSleepCurrentTIM(beacon);
+                return;
+            }
+            pos += count;
+        }
 		GoToSleepCurrentTIM(beacon);
 	}
 
 	void StaWifiMac::GoToSleepNextTIM(S1gBeaconHeader beacon) //to do, merge with GoToSleepCurrentTIM
 	{
+		if (beacon.GetpageSlice().GetPageSliceCount() == 0 &&
+		    beacon.GetpageSlice().GetPageSliceLen() == 1)
+		{
+			// Stay awake for this beacon interval; then wait for this page's recurrence.
+			// With a one-beacon period there is no intervening interval to sleep through.
+			const uint32_t period = beacon.GetpageSlice().GetPagePeriod();
+			if (period <= 1)
+				return;
+			const uint64_t interval = beacon.GetBeaconCompatibility().GetBeaconInterval();
+			const Time next = MicroSeconds(interval - Simulator::Now().GetMicroSeconds() % interval);
+			Simulator::Schedule(next, &StaWifiMac::GoToSleep, this,
+			                    MicroSeconds(interval * (period - 1)));
+			return;
+		}
 		uint8_t BeaconNumForTIM;
 		if (m_selfBlock < m_BlockOffset) //not included in the page slice element
 		{
@@ -620,6 +664,25 @@ StaWifiMac::SendPspollIfnecessary (void)
 
 	void StaWifiMac::GoToSleepCurrentTIM(S1gBeaconHeader beacon)
 	{
+		if (beacon.GetpageSlice().GetPageSliceCount() == 0 &&
+		    beacon.GetpageSlice().GetPageSliceLen() == 1)
+		{
+			const pageSlice slice = beacon.GetpageSlice();
+			const TIM tim = beacon.GetTIM();
+			// A different page gives no schedule for ours: listen at the next DTIM.
+			// For our own whole page, PagePeriod gives its next recurrence.
+			uint32_t beacons = (GetAID() >> 11) == slice.GetPageindex()
+			                  ? slice.GetPagePeriod()
+			                  : (tim.GetDTIMPeriod() > tim.GetDTIMCount()
+			                     ? tim.GetDTIMPeriod() - tim.GetDTIMCount() : 1);
+			if (beacons == 0)
+				beacons = 1;
+			const uint64_t interval = beacon.GetBeaconCompatibility().GetBeaconInterval();
+			const Time remaining = MicroSeconds(interval * beacons -
+			    Simulator::Now().GetMicroSeconds() % interval);
+			GoToSleep(remaining);
+			return;
+		}
 		uint8_t BeaconNumForTIM;
 		if (m_selfBlock < m_BlockOffset) //not included in the page slice element
 		{
@@ -718,7 +781,7 @@ void
 StaWifiMac::SleepIfQueueIsEmpty(bool value)
 {
    waitingack = !value;
-   
+
    if (IsAssociated() && !receivingBeacon)
      {
          if(!HasPacketsInQueue() && !waitingack)
@@ -726,19 +789,19 @@ StaWifiMac::SleepIfQueueIsEmpty(bool value)
             {
                 m_low->GetPhy()->SetSleepMode();
             }
-            
+
          if(HasPacketsInQueue() && !waitingack && !outsideraw && !stationrawslot)
 
             {
                 m_low->GetPhy()->SetSleepMode();
             }
-            
+
          //if (waitingack && !outsideraw && !stationrawslot)
          if (!outsideraw && !stationrawslot)
             {
                 m_low->GetPhy()->SetSleepMode();
             }
-            
+
          if (waitingack && (outsideraw || stationrawslot))
 
             {
@@ -748,23 +811,37 @@ StaWifiMac::SleepIfQueueIsEmpty(bool value)
     }
 }
 
-bool StaWifiMac::HasPacketsInQueue() 
-{           
+bool StaWifiMac::HasPacketsInQueue()
+{
     //NS_LOG_UNCOND ( GetAddress () << " Check packets in queue ");
     //check also if ack received
-    return (m_edca.find(AC_VO)->second->GetEdcaQueue()->GetSize() > 0 || 
-            m_edca.find (AC_VI)->second->GetEdcaQueue()->GetSize() > 0 || 
+    return (m_edca.find(AC_VO)->second->GetEdcaQueue()->GetSize() > 0 ||
+            m_edca.find (AC_VI)->second->GetEdcaQueue()->GetSize() > 0 ||
             m_edca.find (AC_BE)->second->GetEdcaQueue()->GetSize() > 0 ||
-            m_edca.find (AC_BK)->second->GetEdcaQueue()->GetSize() > 0);    
+            m_edca.find (AC_BK)->second->GetEdcaQueue()->GetSize() > 0);
 }
 
 //actions to do when station wakes up for beacon
 void
 StaWifiMac::BeaconWakeUp (void)
 {
+  TraceAssociationDiagnostic ("beacon_wakeup");
     //to be changed when finish shared slot is different to beginning raw interval
     //outsideraw = false;
 
+    // Do not carry an outside-RAW permission across the next beacon boundary.
+    outsideraw = false;
+    stationrawslot = false;
+    if (IsAssociated ())
+      {
+        m_outsideRawEvent.Cancel ();
+        m_pspollDca->AccessAllowedIfRaw (false);
+        m_dca->AccessAllowedIfRaw (false);
+        m_edca.find (AC_VO)->second->AccessAllowedIfRaw (false);
+        m_edca.find (AC_VI)->second->AccessAllowedIfRaw (false);
+        m_edca.find (AC_BE)->second->AccessAllowedIfRaw (false);
+        m_edca.find (AC_BK)->second->AccessAllowedIfRaw (false);
+      }
     m_low->GetPhy()->ResumeFromSleep();
     //if (!this->IsAssociated() && receivingBeacon)
     m_beaconWakeUpEvent = Simulator::Schedule (beaconInterval, &StaWifiMac::BeaconWakeUp, this);
@@ -802,14 +879,14 @@ StaWifiMac::OnDeassociated() {
 
 void
 StaWifiMac::RawSlotStartBackoff (void)
-{    
+{
     if (m_insideBackoffEvent.IsRunning ())
      {
         m_insideBackoffEvent.Cancel ();
      } //a bug is fixed, prevent previous RAW from disabling current RAW.
     Time os = Simulator::Now() + m_currentslotDuration;
     //NS_LOG_UNCOND ( m_low->GetAddress () << " Inside backoff scheduled " << Simulator::Now() << m_currentslotDuration);
-    
+
     m_insideBackoffEvent = Simulator::Schedule(m_currentslotDuration, &StaWifiMac::InsideBackoff, this);
     //m_pspollDca->AccessAllowedIfRaw (true);
     //m_dca->AccessAllowedIfRaw (true);
@@ -1033,6 +1110,7 @@ StaWifiMac::SendDisAssociationRequest (void)
 void
 StaWifiMac::SendAssociationRequest (void)
 {
+  TraceAssociationDiagnostic ("assoc_attempt");
   NS_LOG_FUNCTION (this << GetBssid ());
     //NS_LOG_UNCOND ("StaWifiMac::SendAssociationRequest (void)");
 
@@ -1132,6 +1210,7 @@ StaWifiMac::TryToEnsureAssociated (void)
 void
 StaWifiMac::AssocRequestTimeout (void)
 {
+  TraceAssociationDiagnostic ("assoc_timeout");
   NS_LOG_FUNCTION (this);
   SetState (WAIT_ASSOC_RESP);
   SendAssociationRequest ();
@@ -1148,6 +1227,7 @@ StaWifiMac::ProbeRequestTimeout (void)
 void
 StaWifiMac::MissedBeacons (void)
 {
+  TraceAssociationDiagnostic ("watchdog");
   NS_LOG_FUNCTION (this);
   if (m_beaconWatchdogEnd > Simulator::Now ())
     {
@@ -1197,13 +1277,13 @@ StaWifiMac::IsWaitDisAssocTxOk (void) const
 
 void
 StaWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
-{    
+{
   NS_LOG_FUNCTION (this << packet << to);
-    
+
     //in case a packet is added in the queue, it is check if the station should be awake in that slot
     //in case of shared or own slot, the station wakes up
     NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue," << Simulator::Now().GetSeconds() << "," << m_low->GetPhy()->IsStateSleep());
-    
+
     //code RAW
     if (m_low->GetPhy()->IsStateSleep() && stationrawslot)
     {
@@ -1215,7 +1295,7 @@ StaWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
         NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue outsideraw," << Simulator::Now().GetSeconds());
         WakeUp();
     }
-    
+
   if (!IsAssociated ())
     {
       NotifyTxDrop (packet);
@@ -1284,12 +1364,12 @@ StaWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
 }
 
 
-void 
+void
 StaWifiMac::S1gBeaconReceived (S1gBeaconHeader beacon)
 {
     //NS_LOG_UNCOND ( GetAddress () << " WILL Wake Up for slot " << m_statSlotStart);
     //in case station is receiving beacon, it does not go to sleep
-    receivingBeacon = false;		
+    receivingBeacon = false;
     if (m_outsideRawEvent.IsRunning ())
      {
         m_outsideRawEvent.Cancel ();          //avoid error when actual beacon interval become shorter, otherwise, AccessAllowedIfRaw will set again after raw starting
@@ -1345,6 +1425,7 @@ StaWifiMac::S1gBeaconReceived (S1gBeaconHeader beacon)
 void
 StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 {
+  if (hdr->IsS1gBeacon ()) HALOW_DIAG (GetAddress (), "beacon_sta_entry", "uid=" << packet->GetUid () << " state=" << m_state);
   NS_LOG_FUNCTION (this << packet << hdr);
   NS_ASSERT (!hdr->IsCtl ());
   if (hdr->GetAddr3 () == GetAddress ())
@@ -1472,24 +1553,20 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
      {
         timeDifferenceBeacon = Simulator::Now().GetMicroSeconds() - timeBeacon;
         timeBeacon = Simulator::Now().GetMicroSeconds();
-        if(firstBeacon)
-        {
-            beaconInterval = MicroSeconds (beacon.GetBeaconCompatibility().GetBeaconInterval ());
-            int64x64_t interval = static_cast<int64x64_t> (beaconInterval);
-            interval = interval / 10000000;
-            interval = (interval).GetHigh();
-            interval = interval * 10000000;
-            Time intervalFirstBeacon = static_cast<Time> (interval);
-            //std::cout << "++++++++++++++++++us beaconInterval = " << beaconInterval << "; Now=" << Simulator::Now().GetMicroSeconds() << std::endl;
-            //Time intervallobeacon = MicroSeconds (98920);
-            m_beaconWakeUpEvent = Simulator::Schedule (intervalFirstBeacon, &StaWifiMac::BeaconWakeUp, this);
-            //m_beaconWakeUpEvent = Simulator::Schedule (Time(100000), &StaWifiMac::BeaconWakeUp, this);
-            firstBeacon = false;
-        }
+        // Anchor wake-up to the advertised timestamp, not reception completion.
+        // Unsigned subtraction handles the 32-bit timestamp wrap.
+        const uint32_t intervalUs = beacon.GetBeaconCompatibility().GetBeaconInterval ();
+        const uint32_t ageUs = uint32_t (Simulator::Now().GetMicroSeconds ()) - beacon.GetTimeStamp ();
+        const uint32_t untilNextUs = intervalUs - (ageUs % intervalUs);
+        const uint32_t wakeDelayUs = untilNextUs > 160 ? untilNextUs - 160 : 0;
+        beaconInterval = MicroSeconds (intervalUs);
+        m_beaconWakeUpEvent.Cancel ();
+        m_beaconWakeUpEvent = Simulator::Schedule (MicroSeconds (wakeDelayUs), &StaWifiMac::BeaconWakeUp, this);
+        firstBeacon = false;
         //
         NS_LOG_DEBUG (m_low->GetAddress() << ",beacon:," << Simulator::Now().GetSeconds());
 
-        
+
         UnsetInRAWgroup ();
         uint8_t * rawassign;
         rawassign = beacon.GetRPS().GetRawAssignment();
@@ -1561,7 +1638,9 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
              fastAssocThreshold = AuthenCtrl.GetThreshold();
            }
      }
+    TraceAssociationDiagnostic ("beacon_received");
     S1gBeaconReceived (beacon);
+    TraceAssociationDiagnostic ("beacon_processed");
     waitingack = false;
     outsideraw = false;
     //set when the station has to wake up again (next beacon, own slot, shared slot)
@@ -1607,6 +1686,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         {
           MgtAssocResponseHeader assocResp;
           packet->RemoveHeader (assocResp);
+          HALOW_DIAG (GetAddress (), "assoc_response", "success=" << assocResp.GetStatusCode ().IsSuccess ());
           if (m_assocRequestEvent.IsRunning ())
             {
               m_assocRequestEvent.Cancel ();
@@ -1622,7 +1702,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
                   HtCapabilities htcapabilities = assocResp.GetHtCapabilities ();
                   m_stationManager->AddStationHtCapabilities (hdr->GetAddr2 (),htcapabilities);
                 }
-              
+
               if (m_s1gSupported)
                 {
                   S1gCapabilities s1gcapabilities = assocResp.GetS1gCapabilities ();
@@ -1637,7 +1717,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
                    {
                     if (m_phy->m_deviceRateSet[j] == mode )
                     {
-                       NS_LOG_UNCOND (GetAddress () << ", AddSupportedMode " << hdr->GetAddr2 () << ", " << mode);                        
+                       NS_LOG_UNCOND (GetAddress () << ", AddSupportedMode " << hdr->GetAddr2 () << ", " << mode);
                         m_stationManager->AddSupportedMode (hdr->GetAddr2 (), mode);
                         if (rates.IsBasicRate (mode.GetDataRate ()))
                         {
@@ -1733,6 +1813,20 @@ StaWifiMac::GetS1gCapabilities (void) const
 }
 
 void
+StaWifiMac::TraceAssociationDiagnostic (const char* event)
+{
+  // Do not inspect queues unless this station was explicitly selected.
+  if (!AssociationDiagnosticSelected (GetAddress ())) return;
+  HALOW_DIAG (GetAddress (), event, "state=" << m_state << " aid=" << m_aid
+    << " threshold=" << fastAssocThreshold << " draw=" << assocVaule
+    << " retry_pending=" << m_assocRequestEvent.IsRunning ()
+    << " watchdog_end_ns=" << m_beaconWatchdogEnd.GetNanoSeconds ()
+    << " asleep=" << m_phy->IsStateSleep ()
+    << " dca_allowed=" << m_dca->AccessIfRaw
+    << " queue=" << m_dca->GetQueue ()->GetSize ());
+}
+
+void
 StaWifiMac::SetState (MacState value)
 {
 		if (value == ASSOCIATED && m_state != ASSOCIATED)
@@ -1745,6 +1839,7 @@ StaWifiMac::SetState (MacState value)
 			OnDeassociated();
 
 		}
+  HALOW_DIAG (GetAddress (), "state", "old=" << m_state << " new=" << value);
   m_state = value;
 }
 

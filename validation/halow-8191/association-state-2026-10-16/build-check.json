@@ -1,0 +1,12 @@
+{
+  "build_exit_code": 0,
+  "tests_executed": false,
+  "hashes": {
+    "src/wifi/model/ap-wifi-mac.cc": "e1ecf6aaaa3d8853749e76f597e2becedc3f5391a79b05d74884e809cad4975b",
+    "src/wifi/model/ap-wifi-mac.h": "1d52523fbee5c7ea52493770af768d696530448ba6b14b2aae069e1f00d5f597",
+    "scratch/test/s1g-test-tim-raw.cc": "12d4ad65ddab07487502853123bd753862e532d9cb1f17c2590c8fc2cd703def",
+    "scratch/ap-repeated-association-check.cc": "5eb284ffe8cb42b14cab237464c74309b13f572ec48a78982cf22e00b99708f6",
+    "build-o2/scratch/ap-repeated-association-check": "3c76753ecef181ac022909c23497c7df00bfc680c281c709eff09cb180adef73",
+    "build-o2/scratch/test/test": "588769d5f5ed78a2f2c1aa7f336300eed5fc864c83ac8bac16c49bb272002816"
+  }
+}

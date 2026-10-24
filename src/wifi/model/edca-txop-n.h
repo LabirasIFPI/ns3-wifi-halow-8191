@@ -92,10 +92,10 @@ public:
    * typedef for a callback to invoke when a
    * packet transmission was failed.
    */
-  typedef Callback <void, const WifiMacHeader&> TxFailed;  
-  
+  typedef Callback <void, const WifiMacHeader&> TxFailed;
+
   typedef Callback <void, bool> sleepCallback;
-  
+
   typedef void (* CollisionCallback)(uint32_t nrOfSlotsToBackOff);
 
   typedef void (* TransmissionWillCrossRAWBoundaryCallback)(Time txDuration, Time remainingRawTime);
@@ -106,7 +106,7 @@ public:
   EdcaTxopN ();
   virtual ~EdcaTxopN ();
   void DoDispose ();
-    
+
     bool AccessIfRaw;
 
     uint16_t nrOfTransmissionsDuringRaw = 0;
@@ -138,13 +138,13 @@ public:
    * packet transmission was completed unsuccessfully.
    */
   void SetTxFailedCallback (TxFailed callback);
-  
+
   /**
    * \param callback the callback to invoke when a
    * packet transmission was completed to check if the queue is empty.
    */
   void SetsleepCallback (sleepCallback callback);
-  
+
   /**
    * Set WifiRemoteStationsManager this EdcaTxopN is associated to.
    *
@@ -169,6 +169,7 @@ public:
    * \return WifiMacQueue
    */
   Ptr<WifiMacQueue > GetEdcaQueue () const;
+  void WritePendingDiagnostics (std::ostream &out) const;
 
   virtual void SetMinCw (uint32_t minCw);
   virtual void SetMaxCw (uint32_t maxCw);
@@ -489,18 +490,18 @@ public:
    * \return the number of stream indices assigned by this model
    */
   int64_t AssignStreams (int64_t stream);
-    
+
   void AccessAllowedIfRaw (bool allowed);
   void RawStart (Time duration, bool crossSlotBoundaryAllowed);
   void OutsideRawStart (void);
-  
+
   void SetaccessList (std::map<Mac48Address, bool> list);
   void SetsleepList (std::map<Mac48Address, bool> list);
 
 
 private:
     TracedCallback<double, double > m_AccessQuest_record;
-    
+
   void DoInitialize ();
   /**
    * This functions are used only to correctly set addresses in a-msdu subframe.
@@ -566,7 +567,7 @@ private:
   DcfManager *m_manager;
   Ptr<WifiMacQueue> m_queue;
   TxOk m_txOkCallback;
-  TxFailed m_txFailedCallback;   
+  TxFailed m_txFailedCallback;
   sleepCallback m_sleepCallback;
   Ptr<MacLow> m_low;
   MacTxMiddle *m_txMiddle;
@@ -595,9 +596,9 @@ private:
   uint16_t m_blockAckInactivityTimeout;
   struct Bar m_currentBar;
   bool m_ampduExist;
-  
+
   std::map<Mac48Address, bool> m_accessList;
-  
+
   TracedCallback<uint32_t> m_collisionTrace;
   TracedCallback<Time,Time> m_transmissionWillCrossRAWBoundary;
 

@@ -1,0 +1,36 @@
+{
+  "run": "results/rotating-32-20261017T120949025362Z",
+  "events": {
+    "request_tx": 32,
+    "ap_rx": 32,
+    "echo_rx": 32
+  },
+  "transactions": 32,
+  "complete": 32,
+  "duplicates_ap": 0,
+  "duplicates_echo": 0,
+  "bilateral_final": 32,
+  "phy_rows": 32,
+  "phy_columns": 12,
+  "latency": {
+    "uplink_ms": {
+      "min": 2.280007,
+      "median": 2.2800314999999998,
+      "mean": 9.27219934375,
+      "max": 39.367582
+    },
+    "rtt_ms": {
+      "min": 17.519568,
+      "median": 105.9075455,
+      "mean": 122.10429775,
+      "max": 243.967553
+    },
+    "ap_receive_to_echo_ms": {
+      "min": 15.239548,
+      "median": 101.9137525,
+      "mean": 112.83209840625,
+      "max": 205.239974
+    }
+  },
+  "checks_passed": true
+}

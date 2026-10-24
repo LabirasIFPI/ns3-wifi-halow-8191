@@ -1,0 +1,282 @@
+[
+  {
+    "name": "32-explicit",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/raw-32.txt",
+      "--Nsta=32"
+    ],
+    "expected": 0,
+    "returncode": 0,
+    "passed": true
+  },
+  {
+    "name": "8191-explicit",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/raw-8191-rotating-candidate.txt",
+      "--Nsta=8191"
+    ],
+    "expected": 0,
+    "returncode": 0,
+    "passed": true
+  },
+  {
+    "name": "32-inferred",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/raw-32.txt"
+    ],
+    "expected": 0,
+    "returncode": 0,
+    "passed": true
+  },
+  {
+    "name": "repeated-rps",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/repeated-rps.txt",
+      "--Nsta=32"
+    ],
+    "expected": 0,
+    "returncode": 0,
+    "passed": true
+  },
+  {
+    "name": "overlap",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/overlap.txt",
+      "--Nsta=32"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "mismatch",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/mismatch.txt",
+      "--Nsta=31"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "hole",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/hole.txt",
+      "--Nsta=32"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "reserved-zero",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/reserved-zero.txt"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "invalid-page",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/invalid-page.txt"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "truncated",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/truncated.txt"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "trailing",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/trailing.txt"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "duration-overflow",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/duration-overflow.txt"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  },
+  {
+    "name": "raw-count-mismatch",
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      "/path/to/IEEE-802.11ah-ns-3:/workspace/IEEE-802.11ah-ns-3",
+      "-w",
+      "/workspace/IEEE-802.11ah-ns-3",
+      "-e",
+      "LD_LIBRARY_PATH=build",
+      "ns3-halow-env",
+      "./build/scratch/test/test",
+      "--ValidateRawOnly=1",
+      "--RAWConfigFile=validation/halow-8191/population-checks/raw-count-mismatch.txt",
+      "--NRawSta=31"
+    ],
+    "expected": 2,
+    "returncode": 2,
+    "passed": true
+  }
+]

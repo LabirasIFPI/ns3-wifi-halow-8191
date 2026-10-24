@@ -50,7 +50,7 @@ struct Configuration {
 	uint32_t pagePeriod=2;  	//  Number of Beacon Intervals between DTIM beacons that carry Page Slice element for the associated page
 	uint8_t pageIndex = 0;
 	uint32_t pageSliceLength=1; //  Number of blocks in each TIM for the associated page except for the last TIM (1-31) (value 0 is reserved);
-	uint32_t pageSliceCount=2;  //  Number of TIMs in a single page period (1-31)
+	uint32_t pageSliceCount=0;  //  Number of TIMs in a single page period (1-31)
 	uint8_t blockOffset = 0;  	//  The 1st page slice starts with the block with blockOffset number
 	uint8_t timOffset = 0;    	//  Offset in number of Beacon Intervals from the DTIM that carries the first page slice of the page
 	/*
@@ -58,8 +58,13 @@ struct Configuration {
 	 * */
 	double simulationTime = 60; //60
 	uint32_t seed = 1;
-	int NRawSta;
-	uint32_t Nsta;
+	int NRawSta = -1;
+	uint32_t Nsta = 0; // Infer from RAW when zero.
+	bool ValidateRawOnly = false;
+    bool RotateRawPages = false;
+    double AssociationTimeout = 120;
+    uint32_t TrafficPackets = 4294967295u;
+    string ResultPrefix = "";
 	uint32_t BeaconInterval = 102400;
 
 	double datarate = 7.8;
@@ -95,6 +100,9 @@ struct Configuration {
 	uint32_t coapPayloadSize = 0;//  = 15;
 
 	uint32_t trafficInterval = 10000; //ms 55,110,210,310,410,515,615,720,820,950,1024 beacon interval *4
+	// UINT32_MAX preserves the legacy behavior: use trafficInterval as the
+	// upper bound for the random application start offset.
+	uint32_t trafficStartSpread = 4294967295u;
 	uint32_t trafficIntervalDeviation = 1000; //1000 discuss with Jeroen
 
 	int SlotFormat=0; //0;

@@ -1,0 +1,12 @@
+{
+  "build_exit_code": 0,
+  "simulation_tests": "not_run_user_executes",
+  "sha256": {
+    "src/applications/model/udp-echo-client.cc": "9eaf7245536767141ece37f17d8810ddbb15338d7c94ee148add83d96857852c",
+    "src/applications/model/udp-echo-client.h": "9ca828c9406761bb0049cc995fee7fdd5fe1fd76b730bd59f601bf0a4d419b6d",
+    "scratch/test/s1g-test-tim-raw.cc": "4424f497b1bd27097bdd447be5be94f366ec882730e894f89161cc0add083bc0",
+    "scratch/udp-echo-cooldown-check.cc": "f70148a4f73c5c7fe12c5b14a35df737a79ede15ac69296292af6f1bbf9914f9",
+    "build-o2/scratch/udp-echo-cooldown-check": "56d7c9a69fa1468bd1a9d4ba50a2307aa7ff07d20b346c471bc7ee7dd002de04",
+    "build-o2/scratch/test/test": "e922541c8c66554aae4b92a83dc81e823188e5d1e4df136c7a935839e326dc23"
+  }
+}

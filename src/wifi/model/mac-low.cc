@@ -1,3 +1,4 @@
+#include "association-diagnostics.h"
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006 INRIA
@@ -312,7 +313,7 @@ public:
    * Create a PhyMacLowListener for the given MacLow.
    *
    * \param macLow
-   */      
+   */
     Mac48Address listeneraddress;
   PhyMacLowListener (ns3::MacLow *macLow)
     : m_macLow (macLow)
@@ -734,7 +735,7 @@ MacLow::IsAmpdu (Ptr<const Packet> packet, const WifiMacHeader hdr)
       return false;
     }
 }
-    
+
 uint32_t
 MacLow::GetPspollSize (void) const
 {
@@ -747,11 +748,11 @@ void
 MacLow::SendPspoll ()  //packet is null for ps-poll frame
 {
     NS_LOG_FUNCTION (this);
-    
+
     Ptr<Packet> packet = Create<Packet> ();
     WifiTxVector pspollTxVector;
     pspollTxVector = GetRtsTxVector (packet, &m_currentHdr); // use GetRtsTxVector() for PS-poll, need change
-    
+
     WifiPreamble preamble;
     if (m_phy->GetGreenfield () && m_stationManager->GetGreenfieldSupported (m_currentHdr.GetAddr1 ()))
       {
@@ -774,13 +775,13 @@ MacLow::SendPspoll ()  //packet is null for ps-poll frame
       {
         preamble = WIFI_PREAMBLE_LONG;
       }
-    
+
     Time txDuration = m_phy->CalculateTxDuration (GetPspollSize (), pspollTxVector, preamble, m_phy->GetFrequency (), 0, 0);
-    
+
     packet->AddHeader (m_currentHdr);
     WifiMacTrailer fcs;
     packet->AddTrailer (fcs);
-    
+
     Simulator::Schedule (txDuration, &MacLow::EndTxNoAck, this);
     ForwardDown (packet, &m_currentHdr, pspollTxVector,preamble);
 }
@@ -948,6 +949,8 @@ MacLow::ReceiveOk (Ptr<Packet> packet, double rxSnr, WifiTxVector txVector, Wifi
    */
   WifiMacHeader hdr;
   packet->RemoveHeader (hdr);
+  if (hdr.IsS1gBeacon ()) HALOW_DIAG (m_self, "beacon_low_received", "uid=" << packet->GetUid () << " from=" << hdr.GetAddr2 ());
+  if (hdr.IsData() && hdr.IsToDs() && !hdr.IsFromDs()) HALOW_DIAG(hdr.GetAddr2(), "uplink_low_received", "uid=" << packet->GetUid() << " receiver=" << m_self << " seq=" << hdr.GetSequenceNumber() << " retry=" << hdr.IsRetry());
 
   bool isPrevNavZero = IsNavZero ();
   NS_LOG_DEBUG ("duration/id=" << hdr.GetDuration ());
@@ -1238,6 +1241,8 @@ MacLow::ReceiveOk (Ptr<Packet> packet, double rxSnr, WifiTxVector txVector, Wifi
 rxPacket:
   WifiMacTrailer fcs;
   packet->RemoveTrailer (fcs);
+  if (hdr.IsS1gBeacon ()) HALOW_DIAG (m_self, "beacon_low_forward", "uid=" << packet->GetUid ());
+  if (hdr.IsData() && hdr.IsToDs() && !hdr.IsFromDs()) HALOW_DIAG(hdr.GetAddr2(), "uplink_low_forward", "uid=" << packet->GetUid() << " receiver=" << m_self << " seq=" << hdr.GetSequenceNumber() << " retry=" << hdr.IsRetry());
   m_rxCallback (packet, &hdr);
   return;
 }
@@ -2256,7 +2261,7 @@ MacLow::SendCtsAfterRts (Mac48Address source, Time duration, WifiTxVector rtsTxV
   SnrTag tag;
   tag.Set (rtsSnr);
   packet->AddPacketTag (tag);
-  
+
   WifiPreamble preamble;
   if (ctsTxVector.GetMode ().GetModulationClass () == WIFI_MOD_CLASS_S1G)
     {
@@ -2431,7 +2436,7 @@ MacLow::SendAckAfterData (Mac48Address source, Time duration, WifiMode dataTxMod
   SnrTag tag;
   tag.Set (dataSnr);
   packet->AddPacketTag (tag);
-  
+
   WifiPreamble preamble;
   if (ackTxVector.GetMode ().GetModulationClass () == WIFI_MOD_CLASS_S1G && ackTxVector.GetMode ().GetBandwidth () == 1000000)
     {

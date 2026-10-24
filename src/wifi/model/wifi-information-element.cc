@@ -22,7 +22,7 @@
 #include "ns3/log.h"
 
 namespace ns3 {
-    
+
 NS_LOG_COMPONENT_DEFINE ("WifiInformationElement"); // for test
 
 WifiInformationElement::~WifiInformationElement ()
@@ -64,10 +64,17 @@ WifiInformationElement::Deserialize (Buffer::Iterator i)
 Buffer::Iterator
 WifiInformationElement::DeserializeIfPresent (Buffer::Iterator i)
 {
+  // An optional trailing element can be absent at the end of the buffer.
+  // Do not attempt to read its identifier in that case. Deserialize() still
+  // asserts when a required element consumes no bytes.
+  if (i.IsEnd ())
+    {
+      return i;
+    }
   Buffer::Iterator start = i;
   uint8_t elementId = i.ReadU8 ();
    // NS_LOG_UNCOND ("WifiInformationElement::DeserializeIfPresent 67" << ElementId ()); //for test
-  
+
   //If the element here isn't the one we're after then we immediately
   //return the iterator we were passed indicating that we haven't
   //taken anything from the buffer.
