@@ -42,6 +42,7 @@ Mais detalhes:
 
 - [como reproduzir](docs/REPRODUCAO.md);
 - [artefatos publicados e hashes](docs/ARTEFATOS.md);
+- [principais modificações em relação ao projeto original](MODIFICACOES_DO_FORK.md);
 - [como contribuir](CONTRIBUTING.md).
 
 ## Projeto original
