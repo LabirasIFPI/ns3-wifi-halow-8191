@@ -31,6 +31,15 @@ validá-la com 32 STAs antes de qualquer nova execução longa.
 - [Catálogo, hashes e publicação dos artefatos](../../docs/ARTEFATOS.md).
 - [Comparativo por seed](latency-2026-10-17/comparison-seeds-1-2-3.csv).
 
+### Referência anterior de 13/10
+
+O artefato público `referencia-anterior-8191-2026-10-13.zip` contém os CSVs,
+parâmetros, hashes e evidências diagnósticas da execução que enviou 8.191
+requisições e concluiu 8.161. Ele também inclui a relação das 30 STAs
+incompletas. O pacote permite auditar a falha que precedeu a correção do estado
+de associação sem distribuir o log bruto e o snapshot de rede, que somam cerca
+de 257 MB. Link e SHA-256 estão no catálogo acima.
+
 ### Campanha de carga de 22/10
 
 - o ZIP, seu manifesto e os CSVs normalizados são publicados como artefato de
@@ -54,6 +63,7 @@ refletem a estrutura original; para uso atual, consulte os comandos abaixo.
 | status_rotating.py | Consultar uma execução |
 | analyze_app_events.py | Derivar transações/latências de callbacks de aplicação |
 | package_dataset.py | Empacotar uma execução existente |
+| package_prior_reference.py | Empacotar e validar a referência incompleta de 13/10 |
 | package_campaign.py | Consolidar os três pacotes revisados, agora em pacotes/ |
 | package_load_campaign.py | Consolidar as execuções selecionadas da campanha de carga |
 | analyze_uplink_path.py | Analisar diagnóstico seletivo do caminho uplink |
