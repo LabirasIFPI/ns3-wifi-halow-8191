@@ -11,6 +11,22 @@ O contêiner fixa o ambiente legado necessário ao ns-3 desta base: Ubuntu
 16.04, Python 2.7 e GCC 5.4. O build usa C++11, otimização `-O2`, perfil debug e
 asserts habilitados.
 
+## Obter a revisão publicada
+
+Clone o fork da organização. Para reproduzir o código associado à release de
+validação, use a tag imutável `validacao-2026-10-22`:
+
+```bash
+git clone https://github.com/LabirasIFPI/ns3-wifi-halow-8191.git
+cd ns3-wifi-halow-8191
+git switch --detach validacao-2026-10-22
+```
+
+A branch padrão `master` contém essa implementação e documentação posterior.
+Usar a tag evita que futuras atualizações da branch mudem silenciosamente a
+revisão reproduzida. O clone não contém builds, resultados brutos nem ZIPs;
+esses itens são gerados localmente ou baixados da release.
+
 ## Preparar o ambiente
 
 Na raiz do clone:
