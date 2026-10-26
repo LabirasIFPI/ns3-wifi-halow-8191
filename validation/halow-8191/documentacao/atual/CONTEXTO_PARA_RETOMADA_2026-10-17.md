@@ -1,3 +1,5 @@
+> **Acesso atual (26/10):** este texto preserva o estado histórico. Use [o guia atual](../../../../docs/REPRODUCAO.md) para um clone novo e [o catálogo público](../../../../docs/ARTEFATOS.md) para os CSVs. O snapshot `closure-2026-10-17/` e os contextos/exportações do workspace são locais.
+
 > **Atualização de 20/10/2026:** sucesso funcional confirmado nos seeds 1, 2 e 3; latências dos seeds 2 e 3 e pacote consolidado disponíveis em [ATUALIZACAO_SEEDS_2026-10-20.md](ATUALIZACAO_SEEDS_2026-10-20.md). O registro abaixo preserva o estado de 17/10.
 
 # Retomada — objetivo funcional8191 concluído

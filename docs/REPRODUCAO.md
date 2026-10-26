@@ -3,29 +3,40 @@
 ## Pré-requisitos
 
 - Git;
-- Docker com suporte a contêineres Linux;
+- Docker funcional com suporte a contêineres Linux (ambiente auditado: Linux x86-64);
 - Python 3 no host para o runner e os analisadores;
 - pelo menos 2 GB livres para o build e espaço adicional para resultados.
 
-O contêiner fixa o ambiente legado necessário ao ns-3 desta base: Ubuntu
-16.04, Python 2.7 e GCC 5.4. O build usa C++11, otimização `-O2`, perfil debug e
-asserts habilitados.
+O contêiner usa Ubuntu 16.04, Python 2.7 e GCC 5.4. A imagem base está fixada
+por digest; os pacotes APT são resolvidos durante o build, portanto não se
+promete reconstrução binária idêntica. O build usa C++11, otimização `-O2`,
+perfil debug e asserts habilitados. O acesso ao daemon Docker deve funcionar
+para o usuário que executa os scripts.
 
 ## Obter a revisão publicada
 
 Clone o fork da organização. Para reproduzir o código associado à release de
-validação, use a tag imutável `validacao-2026-10-22`:
+validação, confira o commit para o qual a tag aponta e selecione esse commit:
 
 ```bash
 git clone https://github.com/LabirasIFPI/ns3-wifi-halow-8191.git
 cd ns3-wifi-halow-8191
-git switch --detach validacao-2026-10-22
+git rev-parse 'validacao-2026-10-22^{commit}'
+# Esperado: 47f48a204f5f770b2d5bb18180db2eb75977fdbf
+git switch --detach 47f48a204f5f770b2d5bb18180db2eb75977fdbf
 ```
 
 A branch padrão `master` contém essa implementação e documentação posterior.
-Usar a tag evita que futuras atualizações da branch mudem silenciosamente a
-revisão reproduzida. O clone não contém builds, resultados brutos nem ZIPs;
-esses itens são gerados localmente ou baixados da release.
+Uma tag pode ser movida por quem tem permissão; o hash acima identifica a
+revisão usada nesta receita. O checkout deixa o HEAD destacado, adequado para
+reprodução. Para contribuir, crie uma branch a partir de `origin/master`.
+Consulte os guias atuais na `master`, pois os documentos da tag preservam o
+estado de publicação inicial.
+
+O clone não contém builds, resultados brutos nem ZIPs; esses itens são gerados
+localmente ou baixados da release. O código da release reproduz o perfil; ele
+inclui instrumentação posterior à execução histórica do seed 1 de 16/10.
+Não se espera igualdade dos hashes do binário nem de todos os eventos antigos.
 
 ## Preparar o ambiente
 
@@ -44,6 +55,11 @@ Variáveis opcionais:
 | `HALOW_BUILD_DIR` | `build-o2` | diretório de saída do Waf |
 | `HALOW_BUILD_JOBS` | `2` | paralelismo da compilação |
 
+Essas variáveis são lidas pelos scripts shell. Ao chamar `run_rotating.py`
+diretamente, passe também `--docker-image` e `--build-dir` se tiver alterado os
+padrões. Não reconfigure um build cujas bibliotecas estejam em uso por outra
+simulação.
+
 ## Controle rápido
 
 ```bash
@@ -57,6 +73,8 @@ observadas de slot/página. O caminho do resultado é impresso na execução.
 
 O procedimento foi validado em 23/10/2026 com uma imagem construída do zero e
 um build separado (`build-repro`). O controle terminou em 3,23 s reais.
+Em 26/10, um clone novo do GitHub foi compilado e passou novamente no controle
+(2,48 s), além de nove testes dirigidos; veja [a auditoria](AUDITORIA_2026-10-26.md).
 
 ## Perfil funcional de 8.191 STAs
 
@@ -86,6 +104,20 @@ Critérios do perfil funcional validado:
 - 8.191 ecos recebidos pelas STAs;
 - zero `wrong_slot` e `page_mismatch` observados;
 - quatro filas EDCA vazias no encerramento.
+
+Use o diretório novo impresso pelo runner para calcular as transações:
+
+```bash
+# Substitua pelo caminho efetivamente impresso pelo runner.
+RUN_DIR='results/rotating-8191-SEU_TIMESTAMP'
+python3 validation/halow-8191/analyze_app_events.py "$RUN_DIR"
+```
+
+O analisador cria `run-transactions.csv` e recusa sobrescrevê-lo. Confira 8.191
+chaves distintas completas; `run-association.csv` registra associação bilateral,
+`run-ap-pending.log` registra filas e `run.log` contém o resumo do observador.
+Código zero sozinho não garante entrega completa. Para os seeds 2 e 3, repita
+o runner alterando `--seed`, analisando cada diretório novo separadamente.
 
 ## Campanha de carga
 

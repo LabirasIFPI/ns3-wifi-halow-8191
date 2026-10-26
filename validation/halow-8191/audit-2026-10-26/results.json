@@ -1,0 +1,199 @@
+{
+  "date": "2026-10-26",
+  "reviewed_head_before_changes": "3cd9d348b5e923a8fad7aa9ecdd5ea986f8e2abc",
+  "release_tag": "validacao-2026-10-22",
+  "tested_code_commit": "47f48a204f5f770b2d5bb18180db2eb75977fdbf",
+  "platform": "Linux x86-64",
+  "build": {
+    "fresh_remote_clone": true,
+    "fresh_cpp_build": true,
+    "docker_build_cache_used": true,
+    "cpp_build_seconds": 270.9,
+    "image_tag": "ns3-halow-audit-20261026",
+    "image_id": "sha256:c98b84b2fe8ee302795123d2b2af505d0fdee9c2c52658cfbbfcbe4e8b3af7f1"
+  },
+  "smoke": {
+    "run_id": "rotating-32-20261026T143432250882Z",
+    "exit_code": 0,
+    "wall_seconds": 2.4767195030581206,
+    "stations": 32,
+    "complete_transactions": 160,
+    "duplicate_ap": 0,
+    "duplicate_echo": 0
+  },
+  "directed_tests": [
+    {
+      "test": "ap-raw-page-schedule-check",
+      "exit_code": 0,
+      "output": "PASS: AIDs 1..8191, 2 groups/page, 3 slots/group, page order 2,0,3,1\nPASS: 16 page transitions at time_us=0\nPASS: 16 page transitions at time_us=5000\nPASS: 16 page transitions at time_us=102399\n"
+    },
+    {
+      "test": "ap-repeated-association-check",
+      "exit_code": 0,
+      "output": "initial_wait=1 ack=1 repeated_preserved=1 expired_preserved=1 failed_repeat_preserved=1 recovery_wait=1 new_failure_rejected=1 recovered=1 pass=1\n"
+    },
+    {
+      "test": "interference-idle-check",
+      "exit_code": 0,
+      "output": "history_snr=49727716682467.484 clean_snr=49727716682467.484 history_per=0 clean_per=0 pass=1\nhistory_snr=49727716682467.484 clean_snr=49727716682467.484 history_per=0 clean_per=0 pass=1\nhistory_snr=0.9999999999999799 clean_snr=0.9999999999999799 history_per=1 clean_per=1 pass=1\nPASS: idle history must equal a clean receiver\n"
+    },
+    {
+      "test": "raw-page-beacon-check",
+      "exit_code": 0,
+      "output": "beacon=0 page=0 time_s=0\nbeacon=1 page=1 time_s=0.1024\nbeacon=2 page=2 time_s=0.2048\nbeacon=3 page=3 time_s=0.3072\nbeacon=4 page=0 time_s=0.4096\nbeacon=5 page=1 time_s=0.512\nbeacon=6 page=2 time_s=0.6144\nbeacon=7 page=3 time_s=0.7168\nPASS: AP announcement fields only; STA behavior not tested.\n"
+    },
+    {
+      "test": "sta-whole-page-sleep-check",
+      "exit_code": 0,
+      "output": "time_us=6000 sleeping=1\ntime_us=409599 sleeping=1\ntime_us=409601 sleeping=0\nPASS: synthetic TIM sleep/wake; expected wake_us=409600\n"
+    },
+    {
+      "test": "tim-page-roundtrip-check",
+      "exit_code": 0,
+      "output": "PASS: 20 TIM/Page Slice round trips, including four-byte bitmaps\n"
+    },
+    {
+      "test": "tim-sliced-dense-check",
+      "exit_code": 0,
+      "output": "PASS: 8191 AIDs, two dense slices/page, 160 bytes/slice\n"
+    },
+    {
+      "test": "udp-echo-cooldown-check",
+      "exit_code": 0,
+      "output": "deadline=0 late_start=0 sent=3 received=0 pass=1\ndeadline=1 late_start=0 sent=3 received=3 pass=1\ndeadline=1 late_start=1 sent=0 received=0 pass=1\n"
+    },
+    {
+      "test": "s1g-beacon-receive-check",
+      "exit_code": 0,
+      "output": "clean_extension_fields=1 forwarded=3 expected=3 PASS\n"
+    }
+  ],
+  "public_downloads": [
+    {
+      "name": "dataset-seeds-1-2-3-2026-10-20.zip",
+      "bytes": 7646619,
+      "sha256": "082d0ade43afd8a0a7fff8e19bcbee5f3d3df7fac7a3e1a0d3a3b82928e47401",
+      "manifests": [
+        {
+          "name": "dataset-seeds-1-2-3-2026-10-20/manifest-sha256.json",
+          "files": 84
+        },
+        {
+          "name": "dataset-seeds-1-2-3-2026-10-20/runs/seed1/manifest-sha256.json",
+          "files": 21
+        },
+        {
+          "name": "dataset-seeds-1-2-3-2026-10-20/runs/seed2/manifest-sha256.json",
+          "files": 23
+        },
+        {
+          "name": "dataset-seeds-1-2-3-2026-10-20/runs/seed3/manifest-sha256.json",
+          "files": 23
+        }
+      ]
+    },
+    {
+      "name": "campanha-carga-2026-10-22.zip",
+      "bytes": 2105732,
+      "sha256": "b81c4576ae246f10a9a3818771e369d5c3805b38b7e91a5f01534da0824629bc",
+      "manifests": [
+        {
+          "name": "campanha-carga-2026-10-22/manifest-sha256.json",
+          "files": 174
+        }
+      ]
+    },
+    {
+      "name": "referencia-anterior-8191-2026-10-13.zip",
+      "bytes": 562802,
+      "sha256": "642a4842423cf86e4e558bc17bdfdb4a6872d270e14961431eccec68e498eef7",
+      "manifests": [
+        {
+          "name": "referencia-anterior-8191-2026-10-13/manifest-sha256.json",
+          "files": 19
+        }
+      ]
+    }
+  ],
+  "data_checks": {
+    "functional_stations": 24573,
+    "functional_application_transactions_rederived": 16382,
+    "seeds": {
+      "2": {
+        "mean": 487.79689075338786,
+        "median": 480.768316,
+        "p95": 859.450189,
+        "max": 1827.602092
+      },
+      "3": {
+        "mean": 481.6947172085215,
+        "median": 478.081655,
+        "p95": 853.397665,
+        "max": 1876.089752
+      }
+    },
+    "load_runs_verified": 17,
+    "load_groups": {
+      "640": {
+        "transactions": 8998,
+        "complete": 8998,
+        "mean": 149.80092796877085,
+        "median": 148.5833395,
+        "p95": 251.636099,
+        "max": 446.147531
+      },
+      "600": {
+        "transactions": 9600,
+        "complete": 9600,
+        "mean": 263.410189855,
+        "median": 180.89809400000001,
+        "p95": 824.555796,
+        "max": 1162.832053
+      },
+      "550": {
+        "transactions": 10474,
+        "complete": 9653,
+        "mean": 488.90393886657,
+        "median": 197.719587,
+        "p95": 1354.832056,
+        "max": 1643.647663
+      }
+    },
+    "limits": [
+      "Seed 1 has no complete application event series.",
+      "Load ZIP omits raw application/PHY event logs; transaction metrics and final association/queues were checked, not re-derived from raw logs."
+    ]
+  },
+  "packager_regression": {
+    "matched_source_package_passed": true,
+    "mismatched_source_rejected": true,
+    "no_partial_output_on_mismatch": true,
+    "input": "published seed 3 originals and provenance"
+  },
+  "notion_access": {
+    "validation_page": "3f14f4d8ed6781b88892cfc23a6cbf54",
+    "preparation_page": "3d54f4d8ed6781eaac86fb4558d98861",
+    "validation_fetch_truncated": true,
+    "unsupported_block_id": "4054f4d8-ed67-8036-a2aa-e7fa91a510ac",
+    "unsupported_block_title": "ns3-wifi-halow-8191",
+    "unsupported_block_preserved": true
+  },
+  "preparation_apt_endpoints": {
+    "https://old-releases.ubuntu.com/ubuntu/dists/xenial/Release": 404,
+    "https://archive.ubuntu.com/ubuntu/dists/xenial/Release": 200
+  },
+  "limits": [
+    "No new 8191-STA run was performed.",
+    "Not a line-by-line review of all upstream simulator code or an IEEE conformance audit.",
+    "General setup/visualizer/WSL workflow was reviewed as documentation, not rerun end-to-end.",
+    "The Notion connector cannot completely render the external repository block."
+  ],
+  "document_checks": {
+    "markdown_files": 22,
+    "relative_links_checked": 37,
+    "shell_blocks_parsed": 24,
+    "validation_json_files": 21,
+    "errors": 0
+  },
+  "preparation_apt_update_exit_code": 0
+}

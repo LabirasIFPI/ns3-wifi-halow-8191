@@ -1,5 +1,11 @@
 # Auditoria documental da validação HaLow — 22/10/2026
 
+> Registro histórico de 22–23/10. As pendências de publicação descritas abaixo
+> foram resolvidas: os três ZIPs estão no GitHub. Para o estado de acesso,
+> reprodução e verificações de 26/10, consulte a [auditoria atual](../../../../docs/AUDITORIA_2026-10-26.md)
+> e o [catálogo de artefatos](../../../../docs/ARTEFATOS.md). Referências a
+> `RESULTADOS/`, snapshots e índices do workspace não são caminhos do clone.
+
 ## Escopo
 
 Esta auditoria confronta os índices locais, os pacotes compartilháveis, os

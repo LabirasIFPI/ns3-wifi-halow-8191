@@ -42,6 +42,14 @@ def main():
     assert execution['status'] == 'finished' and execution['exit_code'] == 0
     count = execution['parameters']['stations']
     run_id = run.name
+    root = run.parents[1]
+    provenance_names = ('scratch/test/s1g-test-tim-raw.cc', 'scratch/test/RawObserver.h')
+    recorded_sources = json.loads((run / 'source-hashes.json').read_text())
+    # Never label today's scenario sources as the provenance of an older run.
+    for name in provenance_names:
+        if not (root / name).is_file() or sha(root / name) != recorded_sources.get(name):
+            raise ValueError('Source does not match the recorded run: ' + name +
+                             '; use a checkout/snapshot matching source-hashes.json')
     out.mkdir(parents=True)
     for folder in ('original', 'normalized', 'metadata', 'provenance'):
         (out / folder).mkdir()
@@ -49,8 +57,7 @@ def main():
         shutil.copy2(path, out / 'original' / path.name)
     for name in ('execution.json', 'raw.txt', 'source-hashes.json', 'binary-sha256.txt', 'run-ap-pending.log'):
         shutil.copy2(run / name, out / 'metadata' / name)
-    root = run.parents[1]
-    for name in ('scratch/test/s1g-test-tim-raw.cc', 'scratch/test/RawObserver.h'):
+    for name in provenance_names:
         shutil.copy2(root / name, out / 'provenance' / Path(name).name)
     shutil.copy2(Path(__file__), out / 'provenance' / 'package_dataset.py')
     summaries = read(run / 'run-summary.csv')

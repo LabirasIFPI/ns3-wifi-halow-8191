@@ -34,7 +34,7 @@ git diff --stat 771764a23e7b204ed398cc10731394812b4ff409..HEAD
 | `src/wifi/model/` | 20 | Correções e extensão do MAC/PHY HaLow |
 | `src/applications/model/` | 2 | Separação entre janela de envio e recepção UDP |
 | `scratch/test/` | 6 | Cenário parametrizado, validação e observabilidade |
-| `scratch/*.cc` | 8 | Testes dirigidos de regressão |
+| `scratch/*.cc` na raiz de `scratch/` | 10 | Programas de teste e diagnóstico adicionados |
 | `validation/halow-8191/` | runners, análises e evidências | Execução e auditoria das campanhas |
 | `docker/`, `scripts/` e `.github/` | ambiente e automação | Build reproduzível, smoke test e CI |
 
@@ -210,7 +210,9 @@ Além do núcleo, o fork altera `scratch/test/` para:
 Foram adicionados testes dirigidos em `scratch/` para serialização, TIM denso,
 rotação RAW, associação repetida, suspensão, interferência e cooldown. Os
 scripts em `validation/halow-8191/` executam, analisam e empacotam as campanhas.
-Docker, scripts de build, smoke test e GitHub Actions completam a reprodução.
+Docker e scripts de build/smoke test completam a reprodução. O GitHub Actions
+atual executa somente `scripts/check-repository.sh` (estrutura e sintaxe
+Python); não compila o C++ nem executa as simulações.
 
 ### Mudanças no cenário principal
 
@@ -275,13 +277,16 @@ adequadas a todas as topologias e cargas possíveis.
 Para consultar a diferença exata:
 
 ```bash
-git diff upstream/master..HEAD -- src/wifi src/applications
+git diff 771764a23e7b204ed398cc10731394812b4ff409..HEAD -- src/wifi src/applications
 ```
 
 Para listar somente os arquivos alterados ou examinar uma correção específica:
 
 ```bash
-git diff --name-status upstream/master..HEAD
-git diff upstream/master..HEAD -- src/wifi/model/ap-wifi-mac.cc
-git log --oneline upstream/master..HEAD
+git diff --name-status 771764a23e7b204ed398cc10731394812b4ff409..HEAD
+git diff 771764a23e7b204ed398cc10731394812b4ff409..HEAD -- src/wifi/model/ap-wifi-mac.cc
+git log --oneline 771764a23e7b204ed398cc10731394812b4ff409..HEAD
 ```
+
+Esses comandos funcionam em um clone completo sem configurar o remoto
+`upstream`. Em clones rasos, obtenha o histórico com `git fetch --unshallow origin`.

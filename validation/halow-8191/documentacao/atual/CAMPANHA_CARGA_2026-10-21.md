@@ -1,4 +1,9 @@
-# Preparação da campanha de carga — 21/10/2026
+# Campanha de carga e escala — 21–22/10/2026
+
+Este documento preserva a sequência da campanha já concluída. Os trechos
+“próximo passo” e “controle a executar” são instruções históricas, seguidas
+dos respectivos resultados. A etapa técnica pendente está no índice atual
+e na [auditoria de 26/10](../../../../docs/AUDITORIA_2026-10-26.md).
 
 O runner aceita `--traffic-interval-ms` (inteiro de 1 a 4294967295 ms).
 Quando omitido, mantém `max(1, int(traffic_time * 1000))`.
@@ -14,7 +19,7 @@ início dos clientes. Quando omitido, o cenário preserva a regra anterior:
 `min(intervalo, janela)`. `execution.json` registra o valor efetivo e se o
 modo foi explícito ou legado. Essa alteração exigiu recompilação de `build-o2`.
 
-Nenhuma alteração C++, rádio ou RAW foi feita nesta etapa. Foram verificadas
+Na preparação inicial de 21/10, nenhuma alteração C++, rádio ou RAW foi feita. Foram verificadas
 13 combinações de argumentos com subprocesso substituído por mock e arquivos
 em diretórios temporários: padrão, intervalo explícito, limites uint32,
 entradas inválidas e janela submilissegundo. Nenhuma simulação foi executada.
@@ -57,7 +62,7 @@ recebimentos, ecos, duplicatas e associação final; entrega completa não é
 pressuposta. Analisar o novo diretório impresso pelo runner:
 
 ```bash
-python3 validation/halow-8191/analyze_app_events.py results/rotating-32-<timestamp>
+python3 validation/halow-8191/analyze_app_events.py 'results/rotating-32-SEU_TIMESTAMP'
 ```
 
 Esse controle verifica a configuração; cinco segundos não demonstram regime

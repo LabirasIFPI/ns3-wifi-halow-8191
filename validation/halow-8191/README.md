@@ -16,6 +16,7 @@ regiões de carga e triagem de escala até 8.191 STAs, mantendo aproximadamente
 
 - [Campanha de carga e resultados de escala](documentacao/atual/CAMPANHA_CARGA_2026-10-21.md).
 - [Auditoria documental de 22/10](documentacao/atual/AUDITORIA_DOCUMENTACAO_2026-10-22.md).
+- [Auditoria de publicação e reprodução de 26/10](../../docs/AUDITORIA_2026-10-26.md).
 
 A próxima tarefa técnica é instrumentar a evolução temporal das filas do AP e
 validá-la com 32 STAs antes de qualquer nova execução longa.
@@ -62,7 +63,7 @@ refletem a estrutura original; para uso atual, consulte os comandos abaixo.
 | run_rotating.py | Executar cenário e criar diretório de resultados novo |
 | status_rotating.py | Consultar uma execução |
 | analyze_app_events.py | Derivar transações/latências de callbacks de aplicação |
-| package_dataset.py | Empacotar uma execução existente |
+| package_dataset.py | Empacotar perfil funcional com um pedido completo por STA e fontes coincidentes com os hashes registrados |
 | package_prior_reference.py | Empacotar e validar a referência incompleta de 13/10 |
 | package_campaign.py | Consolidar os três pacotes revisados, agora em pacotes/ |
 | package_load_campaign.py | Consolidar as execuções selecionadas da campanha de carga |
@@ -70,13 +71,22 @@ refletem a estrutura original; para uso atual, consulte os comandos abaixo.
 | analyze_beacon_path.py, analyze_transactions.py | Análises anteriores; consultar limites nos relatórios |
 | run_export.py, check_raw.py | Exportação/checagens da fase inicial |
 
-Exemplo de geração de pacote, na raiz do repositório (usar destino novo):
+Exemplo de geração de pacote de uma nova execução funcional, na raiz do
+repositório (substituir o caminho e usar destino novo):
 
 ```bash
 python3 validation/halow-8191/package_dataset.py \
-  results/rotating-8191-20261020T134315930040Z \
-  validation/halow-8191/pacotes/novo-pacote-seed3
+  'results/rotating-8191-SEU_TIMESTAMP' \
+  validation/halow-8191/pacotes/novo-pacote
 ```
+
+O script compara as duas fontes incluídas em `provenance/` com
+`source-hashes.json` e recusa divergência antes de criar a saída. Para reexportar
+uma execução antiga, use as fontes correspondentes
+em uma cópia separada; não associe fontes atuais aos hashes históricos. A
+referência de 13/10 usa seu empacotador próprio; múltiplos pedidos ou perdas
+exigem o fluxo da campanha de carga. Os empacotadores consolidadores dependem
+dos pacotes/runs de entrada, ausentes em um clone novo.
 
 O script package_campaign.py recusa sobrescrever a campanha já existente.
 Não executar runners apenas para testar caminhos: eles iniciam simulações.

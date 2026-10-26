@@ -29,7 +29,7 @@ agenda eventos nem altera pacotes, embora acrescente custo de I/O real.
 ## Análise
 
 ```bash
-python3 validation/halow-8191/analyze_app_events.py results/rotating-32-<timestamp>
+python3 validation/halow-8191/analyze_app_events.py 'results/rotating-32-SEU_TIMESTAMP'
 ```
 
 Cria `run-transactions.csv`, recusando sobrescrita. Chave dentro da execução:

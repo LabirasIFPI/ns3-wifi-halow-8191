@@ -33,3 +33,39 @@ normalizados. O segundo contém a calibração de carga e a triagem de escala at
 de 13/10, na qual 8.161 das 8.191 transações foram concluídas; ele documenta a
 falha corrigida e não substitui a referência funcional. Consulte
 `validation/halow-8191/README.md` para escopo e limites.
+
+## Onde abrir os CSVs
+
+Após extrair cada ZIP, entre na pasta com o mesmo nome do arquivo:
+
+| Pacote | Caminho interno | Conteúdo |
+|---|---|---|
+| Três seeds | `normalized/stations.csv`, `runs.csv`, `transmissions.csv`, `beacons.csv` | Tabelas consolidadas dos três seeds, todas em `normalized/` |
+| Três seeds | `normalized/transactions.csv`, `normalized/app_events.csv` | Latências/eventos dos seeds 2 e 3; ausentes no seed 1 |
+| Três seeds | `runs/seed1/original/` (ou `seed2`, `seed3`) | CSVs originais selecionados por execução |
+| Carga | `campaign-summary.csv`, `runs/<label>/run-transactions.csv` | Resumo das 17 execuções e transações, incluindo perdas e duplicatas |
+| Referência anterior | `original/`, `normalized/incomplete-stations.csv`, `evidence/` | Cinco CSVs e diagnóstico das 30 STAs incompletas |
+
+Use `data_dictionary.csv` do pacote funcional para interpretar as colunas e
+unidades. O `run-phy.csv` antigo tem sete rótulos para doze campos; nos três
+seeds, prefira os campos PHY de `normalized/stations.csv`. Na referência de
+13/10, o PHY foi preservado no formato original, sem normalização; a tabela
+`normalized/stations.csv` desse terceiro pacote contém apenas os contadores
+por STA. O rótulo PHY legado `collision` corresponde a CCA_BUSY, não a uma
+contagem comprovada de colisões.
+
+Os manifestos internos permitem conferir os arquivos extraídos. No pacote
+anterior, `validation.json:status=passed` significa que as checagens do pacote
+passaram; o resultado experimental continua sendo 30 transações incompletas.
+
+Os ZIPs são exportações selecionadas, não cópias completas de `results/`.
+Logs brutos e `run.nss` permanecem locais. Na campanha de carga também faltam
+os eventos brutos de aplicação e os CSVs PHY/RAW completos: as latências podem
+ser recalculadas das transações publicadas, mas a derivação inteira desde os
+callbacks e as contagens RAW exige os originais. O snapshot histórico de
+fontes em `closure-2026-10-17/` também é local e não é baixado com o clone.
+
+Para repetir o perfil, use o código Git e [o guia de reprodução](REPRODUCAO.md).
+Para examinar os resultados já obtidos, bastam os ZIPs e seus limites acima.
+Os três pacotes publicados mantêm seus hashes originais; atualizações dos
+guias ou empacotadores no Git não reescrevem esses arquivos.

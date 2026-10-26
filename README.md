@@ -44,12 +44,17 @@ Mais detalhes:
 
 - [como reproduzir](docs/REPRODUCAO.md);
 - [artefatos publicados e hashes](docs/ARTEFATOS.md);
+- [auditoria de publicação e reprodução de 26/10](docs/AUDITORIA_2026-10-26.md);
 - [escopo de alcance, topologia e organização dos 8.191 AIDs](docs/ESCOPO_RADIO.md);
 - [inventário detalhado das modificações em relação ao projeto original](MODIFICACOES_DO_FORK.md),
   com arquivos afetados, motivação, impacto e testes correspondentes;
 - [como contribuir](CONTRIBUTING.md).
 
 ## Projeto original
+
+O conteúdo abaixo preserva as instruções do upstream. Para reproduzir a
+validação deste fork, use [o guia com Docker](docs/REPRODUCAO.md): os comandos
+legados que clonam apenas `imec-idlab` não incluem nossas correções.
 
 If you use our work, you can use the following citation to refer to it:
 > Le Tian, Amina Sljivo, Serena Santi, Eli De Poorter, Jeroen Hoebeke, Jeroen Famaey. **Extension of the IEEE 802.11ah NS-3 Simulation Module.** Workshop on ns-3 (WNS3), 2018.

@@ -34,7 +34,7 @@ a execução8191 com os AIDs ausentes originais e controles que entregaram.
 Leitura da nova execução:
 
 ```bash
-python3 validation/halow-8191/analyze_uplink_path.py results/rotating-32-<timestamp>
+python3 validation/halow-8191/analyze_uplink_path.py 'results/rotating-32-SEU_TIMESTAMP'
 ```
 
 A causa dos 30 pedidos permanece pendente. O teste2048 com cooldown20 já

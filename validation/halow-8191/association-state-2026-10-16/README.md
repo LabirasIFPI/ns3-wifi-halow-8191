@@ -1,5 +1,11 @@
 # Pedidos tardios de associação e divergência AP/STA
 
+> Este diagnóstico preserva a falha e a etapa de investigação. O estado
+> `aborted_buffer_assert` de `test-status.json` descreve a primeira tentativa,
+> não o estado atual. A correção e o sucesso posterior estão em
+> [optional-ie-fix.md](optional-ie-fix.md), `result-8191-fixed.json` e no
+> [relatório final](../documentacao/atual/RELATORIO_FINAL_2026-10-17.md).
+
 Referência: rotating-8191-20261013T131852187444Z. Resultado 8191 envios,
 8161 recebimentos AP e 8161 ecos. As 30 STAs sem recebimento tiveram seus
 pedidos de dados recebidos com sucesso pelo PHY, encaminhados por MacLow e
