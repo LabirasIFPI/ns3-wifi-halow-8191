@@ -14,7 +14,9 @@ a um único AP**, com RAW/TIM paginado e tráfego UDP Echo.
 O perfil funcional foi concluído em três seeds. A campanha de carga também
 testou 8.191 STAs a aproximadamente 50 pedidos/s no seed 1, com 8.191
 transações completas. Esses resultados caracterizam a configuração documentada;
-não representam certificação integral do padrão ou capacidade máxima universal.
+não representam certificação integral do padrão, capacidade máxima universal ou
+alcance físico máximo do Wi-Fi HaLow. As STAs estavam estáticas em um disco de
+10 m ao redor do AP; consulte o [escopo de alcance e topologia](docs/ESCOPO_RADIO.md).
 
 Builds, resultados brutos e ZIPs são deliberadamente excluídos do Git. Eles são
 recriáveis ou publicados como artefatos com SHA-256, evitando um clone de vários
@@ -42,6 +44,7 @@ Mais detalhes:
 
 - [como reproduzir](docs/REPRODUCAO.md);
 - [artefatos publicados e hashes](docs/ARTEFATOS.md);
+- [escopo de alcance, topologia e organização dos 8.191 AIDs](docs/ESCOPO_RADIO.md);
 - [inventário detalhado das modificações em relação ao projeto original](MODIFICACOES_DO_FORK.md),
   com arquivos afetados, motivação, impacto e testes correspondentes;
 - [como contribuir](CONTRIBUTING.md).

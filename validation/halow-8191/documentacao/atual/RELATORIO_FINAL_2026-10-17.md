@@ -34,6 +34,15 @@ prazo de associação600 s, cooldown10 s; duas fatias TIM de16 blocos por págin
 RAW rotativo nas quatro páginas, três slots por RPS, CSB habilitado.
 O comando e o RAW exatos estão em `execution.json`, `command.sh` e `raw.txt`.
 
+As STAs foram distribuídas aleatoriamente em um disco de 10 m, com o AP no
+centro, e permaneceram imóveis. Cada STA se comunicou diretamente com o AP; não
+houve mesh, repetidor ou salto intermediário. Os 8.191 AIDs foram atendidos ao
+longo do tempo por quatro páginas e pelos grupos/slots RAW, e não por transmissões
+simultâneas. Como o modelo não inclui paredes, shadowing aleatório ou uma
+varredura de distâncias, esta evidência valida escala lógica e comportamento
+MAC/RAW/TIM no perfil descrito, não o alcance físico máximo do Wi-Fi HaLow. O
+escopo detalhado está em `docs/ESCOPO_RADIO.md`.
+
 ## Correções e sequência de validação
 
 O trabalho anterior ajustou população/AIDs, rotação RAW e TIM/Page Slice,

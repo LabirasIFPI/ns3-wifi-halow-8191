@@ -3,6 +3,11 @@
 **Objetivo funcional concluído:** 8191 STAs, um AP, três seeds com entrega
 completa e associação bilateral final. Latências completas nos seeds2/3.
 
+**Escopo de rádio:** as 8.191 STAs estavam imóveis e distribuídas em até 10 m
+de um AP central, sem mesh, repetidores, paredes ou shadowing aleatório. O
+resultado valida escala lógica e RAW/TIM paginado nesse perfil; não valida o
+alcance máximo do Wi-Fi HaLow. Consulte [o escopo de alcance e topologia](../../docs/ESCOPO_RADIO.md).
+
 **Campanha de carga atualizada em 22/10/2026:** calibração com 32 STAs em três
 regiões de carga e triagem de escala até 8.191 STAs, mantendo aproximadamente
 50 pedidos/s agregados. O ponto de 8.191 STAs entregou 8.191/8.191 transações.

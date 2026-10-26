@@ -56,6 +56,13 @@ python3 validation/halow-8191/run_rotating.py \
 O runner grava o comando exato, parâmetros, hashes do binário e das fontes,
 uso de recursos e código de saída. Ele nunca reutiliza um diretório de resultado.
 
+Neste perfil, as STAs são estáticas e distribuídas aleatoriamente em um disco de
+10 m, com o AP no centro. Todas se comunicam diretamente com esse AP; não há
+mesh nem repetidores. O cenário usa taxa fixa `MCS2_0` em 2 MHz e um modelo
+logarítmico de propagação sem paredes ou shadowing aleatório. Portanto, esta
+reprodução verifica escala lógica e comportamento MAC/RAW/TIM, não o alcance
+físico máximo do HaLow. Veja [o escopo completo](ESCOPO_RADIO.md).
+
 Critérios do perfil funcional validado:
 
 - associação bilateral final para os 8.191 AIDs;
